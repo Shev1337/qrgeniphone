@@ -401,7 +401,7 @@ func printQR(image: UIImage, title: String, caption: String) {
             .frame(width: 600, height: 600)
         
         // Серый текст для печати (изменяйте здесь под печать)
-        Text("Здесь будет ваше описание QR-кода")
+        Text("Покажите QR-код контроллеру")
             .font(.system(size: 28, weight: .regular))
             .foregroundColor(Color(white: 0.55))
             .multilineTextAlignment(.center)
