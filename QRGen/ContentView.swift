@@ -209,17 +209,31 @@ struct ContentView: View {
 
             Spacer(minLength: 12)
 
-            ShareLink(
-                item: Image(uiImage: image),
-                preview: SharePreview(caption.isEmpty ? "QR-код" : caption.uppercased(), image: Image(uiImage: image))
-            ) {
-                VStack(spacing: 6) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 22))
-                    Text("Поделиться")
-                        .font(.footnote)
+            HStack(spacing: 44) {
+                Button {
+                    printQR(image: image, caption: caption)
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: "printer")
+                            .font(.system(size: 18))
+                        Text("Квитанция")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.black)
                 }
-                .foregroundColor(.black)
+
+                ShareLink(
+                    item: Image(uiImage: image),
+                    preview: SharePreview(caption.isEmpty ? "QR-код" : caption.uppercased(), image: Image(uiImage: image))
+                ) {
+                    VStack(spacing: 5) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18))
+                        Text("Поделиться")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.black)
+                }
             }
             .padding(.bottom, 28)
         }
@@ -259,4 +273,36 @@ func makeQR(from string: String) -> UIImage {
     let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
     guard let cg = context.createCGImage(scaled, from: scaled.extent) else { return UIImage() }
     return UIImage(cgImage: cg)
+}
+
+@MainActor
+func printQR(image: UIImage, caption: String) {
+    let content = VStack(spacing: 40) {
+        Image(uiImage: image)
+            .interpolation(.none)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 600, height: 600)
+        if !caption.isEmpty {
+            Text(caption.uppercased())
+                .font(.system(size: 56, weight: .bold))
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+        }
+    }
+    .padding(80)
+    .background(Color.white)
+
+    let renderer = ImageRenderer(content: content)
+    renderer.scale = 2
+    guard let sheet = renderer.uiImage else { return }
+
+    let info = UIPrintInfo(dictionary: nil)
+    info.outputType = .general
+    info.jobName = caption.isEmpty ? "QR-код" : caption
+
+    let controller = UIPrintInteractionController.shared
+    controller.printInfo = info
+    controller.printingItem = sheet
+    controller.present(animated: true)
 }
