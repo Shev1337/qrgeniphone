@@ -216,7 +216,9 @@ struct ContentView: View {
         let h = min(full, max(base - drag, full * 0.5))
         // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
-        let qrSide = lerp(220, min(size.width - 72, 340), t)
+        
+        // Увеличили размеры QR-кода (раньше было от 200 до 340, теперь от 230 до 390)
+        let qrSide = lerp(230, min(size.width - 56, 390), t)
 
         return VStack(spacing: 0) {
             // Полоска сверху: тянуть вверх — развернуть, вниз — свернуть/закрыть
@@ -224,7 +226,7 @@ struct ContentView: View {
                 .fill(Color(white: 0.8))
                 .frame(width: 40, height: 5)
                 .padding(.top, 8)
-                .padding(.bottom, 8)
+                .padding(.bottom, 6)
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { toggleExpanded() }
@@ -234,12 +236,12 @@ struct ContentView: View {
                     Spacer()
                 } else {
                     Text(title)
-                        .font(.system(size: lerp(20, 28, t), weight: .semibold))
+                        .font(.system(size: lerp(18, 26, t), weight: .semibold))
                         .foregroundColor(.black)
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 6)
+                        .padding(.top, 4)
                 }
                 Button { close() } label: {
                     Image(systemName: "xmark")
@@ -249,43 +251,43 @@ struct ContentView: View {
                 }
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 2)
 
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
                 .frame(width: qrSide, height: qrSide)
-                .padding(10)
+                .padding(8)
                 .background(Color.white)
 
-            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ (изменяйте текст здесь)
-            Text("Здесь будет ваше описание QR-кода")
-                .font(.system(size: lerp(12, 14, t), weight: .regular))
+            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ
+            Text("Покажите QR-код контроллеру")
+                .font(.system(size: lerp(11, 13, t), weight: .regular))
                 .foregroundColor(Color(white: 0.55))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 6)
+                .padding(.top, 4)
                 .padding(.horizontal, 16)
 
             if !caption.isEmpty {
                 Text(caption.uppercased())
-                    .font(.system(size: lerp(16, 22, t), weight: .semibold))
+                    .font(.system(size: lerp(15, 20, t), weight: .semibold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, lerp(8, 14, t))
+                    .padding(.top, lerp(6, 10, t))
                     .padding(.horizontal, 16)
             }
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 8)
 
             HStack(spacing: 44) {
                 Button {
                     printQR(image: image, title: title, caption: caption)
                 } label: {
-                    VStack(spacing: 5) {
+                    VStack(spacing: 4) {
                         Image(systemName: "printer")
                             .font(.system(size: 18))
                         Text("Печать")
@@ -298,7 +300,7 @@ struct ContentView: View {
                     item: Image(uiImage: image),
                     preview: SharePreview(caption.isEmpty ? "QR-код" : caption.uppercased(), image: Image(uiImage: image))
                 ) {
-                    VStack(spacing: 5) {
+                    VStack(spacing: 4) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 18))
                         Text("Поделиться")
@@ -307,7 +309,7 @@ struct ContentView: View {
                     .foregroundColor(.black)
                 }
             }
-            .padding(.bottom, 28)
+            .padding(.bottom, 24)
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
@@ -387,33 +389,34 @@ func makeQR(from string: String) -> UIImage {
 
 @MainActor
 func printQR(image: UIImage, title: String, caption: String) {
-    let content = VStack(spacing: 30) {
+    let content = VStack(spacing: 24) {
         if !title.isEmpty {
             Text(title)
-                .font(.system(size: 52, weight: .semibold))
+                .font(.system(size: 48, weight: .semibold))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
+        // Увеличили QR-код и для печати (было 600, стало 700)
         Image(uiImage: image)
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .frame(width: 600, height: 600)
+            .frame(width: 700, height: 700)
         
-        // Серый текст для печати (изменяйте здесь под печать)
-        Text("Покажите QR-код контроллеру")
-            .font(.system(size: 28, weight: .regular))
+        // Серый текст для печати
+        Text("Здесь будет ваше описание QR-кода")
+            .font(.system(size: 26, weight: .regular))
             .foregroundColor(Color(white: 0.55))
             .multilineTextAlignment(.center)
 
         if !caption.isEmpty {
             Text(caption.uppercased())
-                .font(.system(size: 56, weight: .bold))
+                .font(.system(size: 52, weight: .bold))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
     }
-    .padding(80)
+    .padding(60)
     .background(Color.white)
 
     let renderer = ImageRenderer(content: content)
