@@ -30,6 +30,7 @@ struct ContentView: View {
     @AppStorage("savedCaption") private var caption = ""
     @AppStorage("savedTitle") private var title = ""
     @AppStorage("savedItems") private var savedData = ""
+    @AppStorage("density") private var density = 0
 
     @State private var showCard = false
     @State private var expanded = false
@@ -102,6 +103,18 @@ struct ContentView: View {
                 .padding()
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Плотность QR-кода")
+                    .font(.footnote)
+                    .foregroundColor(Color(white: 0.5))
+                Picker("Плотность QR-кода", selection: $density) {
+                    Text("Обычная").tag(0)
+                    Text("Плотная").tag(1)
+                    Text("Максимум").tag(2)
+                }
+                .pickerStyle(.segmented)
+            }
 
             HStack(spacing: 12) {
                 Button {
@@ -209,7 +222,7 @@ struct ContentView: View {
     // MARK: - Карточка с QR
 
     private func card(size: CGSize) -> some View {
-        let image = makeQR(from: link)
+        let image = makeQR(from: densePayload(link, level: density))
         let full = size.height
         let collapsed = full * collapsedRatio
         let base = expanded ? full : collapsed
@@ -217,7 +230,6 @@ struct ContentView: View {
         // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
-        // Увеличили размеры QR-кода (раньше было от 200 до 340, теперь от 230 до 390)
         let qrSide = lerp(230, min(size.width - 56, 390), t)
 
         return VStack(spacing: 0) {
@@ -262,7 +274,7 @@ struct ContentView: View {
                 .background(Color.white)
 
             // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ
-            Text("Покажите QR-код контроллеру")
+            Text("Здесь будет ваше описание QR-кода")
                 .font(.system(size: lerp(11, 13, t), weight: .regular))
                 .foregroundColor(Color(white: 0.55))
                 .multilineTextAlignment(.center)
@@ -396,7 +408,6 @@ func printQR(image: UIImage, title: String, caption: String) {
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
-        // Увеличили QR-код и для печати (было 600, стало 700)
         Image(uiImage: image)
             .interpolation(.none)
             .resizable()
@@ -404,8 +415,8 @@ func printQR(image: UIImage, title: String, caption: String) {
             .frame(width: 700, height: 700)
         
         // Серый текст для печати
-        Text("Здесь будет ваше описание QR-кода")
-            .font(.system(size: 26, weight: .regular))
+        Text("Покажите QR-код контроллеру")
+            .font(.system(size: 32, weight: .regular))
             .foregroundColor(Color(white: 0.55))
             .multilineTextAlignment(.center)
 
@@ -431,4 +442,27 @@ func printQR(image: UIImage, title: String, caption: String) {
     controller.printInfo = info
     controller.printingItem = sheet
     controller.present(animated: true)
+}
+
+/// Делает QR плотнее: к http(s)-ссылке добавляется «хвост» после #,
+/// который сайт игнорирует. Чем длиннее данные, тем больше клеток в коде.
+func densePayload(_ link: String, level: Int) -> String {
+    let lower = link.lowercased()
+    guard level > 0,
+          lower.hasPrefix("http://") || lower.hasPrefix("https://"),
+          !link.contains("#") else { return link }
+
+    let target = level == 1 ? 55 : 95
+    let need = target - link.utf8.count - 1
+    guard need > 0 else { return link }
+
+    var seed = UInt64(5381)
+    for b in link.utf8 { seed = seed &* 33 &+ UInt64(b) }
+    let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+    var tail = ""
+    for _ in 0..<need {
+        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+        tail.append(alphabet[Int((seed >> 33) % UInt64(alphabet.count))])
+    }
+    return link + "#" + tail
 }
