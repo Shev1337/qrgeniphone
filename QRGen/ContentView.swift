@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var showScanner = false // Состояние для открытия сканера
     @State private var expanded = false
     @State private var drag: CGFloat = 0
+    @State private var originalBrightness: CGFloat = 1.0 // Для сохранения прежней яркости
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
@@ -433,18 +434,27 @@ struct ContentView: View {
     }
 
     private func openCard() {
-        hideKeyboard()
-        expanded = false
-        drag = 0
-        withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+    hideKeyboard()
+    expanded = false
+    drag = 0
+    
+    // Сохраняем текущую яркость и выкручиваем на максимум
+    originalBrightness = UIScreen.main.brightness
+    UIScreen.main.brightness = 1.0
+    
+    withAnimation(.easeOut(duration: 0.3)) { 
+        showCard = true 
     }
+}
 
-    private func toggleExpanded() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            expanded.toggle()
-            drag = 0
-        }
+    private func close() {
+    // Возвращаем исходную яркость экрана при закрытии
+    UIScreen.main.brightness = originalBrightness
+    
+    withAnimation(.easeIn(duration: 0.25)) { 
+        showCard = false 
     }
+}
 
     private func close() {
         withAnimation(.easeIn(duration: 0.25)) { showCard = false }
