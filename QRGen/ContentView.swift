@@ -425,7 +425,7 @@ struct ContentView: View {
                         expanded = true
                         drag = 0
                     } else if dy > 130 || predicted > 300 {
-                        showCard = false
+                        close()
                     } else {
                         drag = 0
                     }
@@ -434,30 +434,33 @@ struct ContentView: View {
     }
 
     private func openCard() {
-    hideKeyboard()
-    expanded = false
-    drag = 0
-    
-    // Сохраняем текущую яркость и выкручиваем на максимум
-    originalBrightness = UIScreen.main.brightness
-    UIScreen.main.brightness = 1.0
-    
-    withAnimation(.easeOut(duration: 0.3)) { 
-        showCard = true 
+        hideKeyboard()
+        expanded = false
+        drag = 0
+        
+        // Сохраняем текущую яркость и выкручиваем на максимум
+        originalBrightness = UIScreen.main.brightness
+        UIScreen.main.brightness = 1.0
+        
+        withAnimation(.easeOut(duration: 0.3)) { 
+            showCard = true 
+        }
     }
-}
+
+    private func toggleExpanded() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            expanded.toggle()
+            drag = 0
+        }
+    }
 
     private func close() {
-    // Возвращаем исходную яркость экрана при закрытии
-    UIScreen.main.brightness = originalBrightness
-    
-    withAnimation(.easeIn(duration: 0.25)) { 
-        showCard = false 
-    }
-}
-
-    private func close() {
-        withAnimation(.easeIn(duration: 0.25)) { showCard = false }
+        // Возвращаем исходную яркость экрана при закрытии
+        UIScreen.main.brightness = originalBrightness
+        
+        withAnimation(.easeIn(duration: 0.25)) { 
+            showCard = false 
+        }
     }
 }
 
