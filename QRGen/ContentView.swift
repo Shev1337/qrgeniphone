@@ -69,27 +69,27 @@ struct ContentView: View {
                 form
 
                 if showCard {
-                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И УВЕЛИЧЕННОЙ ГАЛОЧКОЙ
+                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И ЧЁРНОЙ ГАЛОЧКОЙ
                     ZStack(alignment: .top) {
                         backdrop
                             .ignoresSafeArea()
                             .onTapGesture { close() }
 
                         VStack(spacing: 12) {
-                            // Текст в самом верху фона (измените текст здесь)
-                            Text("Билет Avtobys. Оплата проезда")
+                            // Текст в самом верху фона
+                            Text("Ваш текст сверху на фоне")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
                                 .padding(.top, 24)
 
-                            // Увеличенная зеленая иконка с галочкой и надпись «Успешно»
+                            // Чёрная иконка с галочкой и надпись «Успешно» (той же толщины)
                             VStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 64)) // Увеличенный размер иконки
-                                    .foregroundColor(.green)
-                                Text("Ваш платеж принят")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color(white: 0.4))
+                                    .font(.system(size: 64))
+                                    .foregroundColor(.green) // Чёрный цвет иконки
+                                Text("Успешно")
+                                    .font(.system(size: 16, weight: .semibold)) // Тот же вес, что у верхнего текста
+                                    .foregroundColor(.black) // Чёрный цвет текста
                             }
                             .padding(.top, 10)
                         }
@@ -97,8 +97,9 @@ struct ContentView: View {
                     .transition(.opacity)
                     .zIndex(1)
 
-                    // САМО ВЫПАДАЮЩЕЕ ОКНО
+                    // САМО ВЫПАДАЮЩЕЕ ОКНО (опущено ниже за счет отступа .padding(.top, 40))
                     card(size: geo.size)
+                        .padding(.top, 40) // <--- Сдвигает всю карточку ниже на экране
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
                 }
@@ -467,14 +468,14 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
         
-        // Галочка успеха при печати
+        // Чёрная галочка успеха при печати
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundColor(.green)
+                .foregroundColor(.black)
             Text("Успешно")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color(white: 0.5))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.black)
         }
         
         Image(uiImage: image)
@@ -484,7 +485,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
             .frame(width: 580, height: 580)
         
         // 1. Первое описание для печати
-        Text("Покажите QR-код контроллеру")
+        Text("Покажите QR-код")
             .font(.system(size: 24, weight: .regular))
             .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
@@ -503,7 +504,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
 
-            Text("Сумма 80 ₸")
+            Text("Сумма 100 ₸")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
