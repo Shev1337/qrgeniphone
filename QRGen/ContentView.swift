@@ -76,18 +76,19 @@ struct ContentView: View {
                             .onTapGesture { close() }
 
                         VStack(spacing: 8) {
-                            Text("Ваш текст сверху на фоне")
+                            Text("Билет Avtobys. Оплата проезда")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .padding(.top, 12)
+                                .padding(.top, 6)
 
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
                                     .foregroundStyle(.white, .green)
-                                Text("Успешно")
+                                Text("Ваш платеж принят")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.black)
+                                    .padding(.top, 6)
                             }
                             .padding(.top, 6)
                         }
@@ -333,7 +334,7 @@ struct ContentView: View {
                 .padding(4)
                 .background(Color.white)
 
-            Text("Покажите QR-код")
+            Text("Покажите QR-код контроллеру")
                 .font(.system(size: lerp(12, 14, t), weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
@@ -357,7 +358,7 @@ struct ContentView: View {
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
                     .foregroundColor(.black)
 
-                Text("Сумма 100 ₸")
+                Text("Сумма 80 ₸")
                     .font(.system(size: lerp(12, 14, t), weight: .light))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
