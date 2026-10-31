@@ -69,12 +69,35 @@ struct ContentView: View {
                 form
 
                 if showCard {
-                    backdrop
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                        .onTapGesture { close() }
-                        .zIndex(1)
+                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И УВЕЛИЧЕННОЙ ГАЛОЧКОЙ
+                    ZStack(alignment: .top) {
+                        backdrop
+                            .ignoresSafeArea()
+                            .onTapGesture { close() }
 
+                        VStack(spacing: 12) {
+                            // Текст в самом верху фона (измените текст здесь)
+                            Text("Билет Avtobys. Оплата проезда")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.black)
+                                .padding(.top, 24)
+
+                            // Увеличенная зеленая иконка с галочкой и надпись «Успешно»
+                            VStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 64)) // Увеличенный размер иконки
+                                    .foregroundColor(.green)
+                                Text("Ваш платеж принят")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color(white: 0.4))
+                            }
+                            .padding(.top, 10)
+                        }
+                    }
+                    .transition(.opacity)
+                    .zIndex(1)
+
+                    // САМО ВЫПАДАЮЩЕЕ ОКНО
                     card(size: geo.size)
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
@@ -238,7 +261,6 @@ struct ContentView: View {
     // MARK: - Карточка с QR
 
     private func card(size: CGSize) -> some View {
-        // Добавляем текущие миллисекунды к ссылке, чтобы хэш QR-кода всегда отличался
         let uniquePayload = link.contains("?") ? "\(link)&rnd=\(Int(Date().timeIntervalSince1970 * 1000))" : "\(link)?rnd=\(Int(Date().timeIntervalSince1970 * 1000))"
         let image = makeQR(from: densePayload(uniquePayload, level: density))
         let full = size.height
@@ -251,8 +273,16 @@ struct ContentView: View {
         let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
-            
-            // ВЕРХНЯЯ ШАПКА: Текст слева вместо полоски, кнопка закрытия справа
+            // Полоска сверху на карточке
+            Capsule()
+                .fill(Color(white: 0.8))
+                .frame(width: 40, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { toggleExpanded() }
+
             HStack(alignment: .center) {
                 if !title.isEmpty {
                     Text(title)
@@ -272,19 +302,6 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 4)
-            .padding(.top, 8)
-
-            // ИКОНКА УСПЕХА: Зеленый кружок с галочкой и подпись «Успешно»
-            VStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: lerp(32, 40, t)))
-                    .foregroundColor(.green)
-                
-                Text("Успешно")
-                    .font(.system(size: lerp(12, 14, t), weight: .medium))
-                    .foregroundColor(Color(white: 0.5))
-            }
-            .padding(.top, 4)
 
             Spacer(minLength: 1)
 
@@ -298,7 +315,7 @@ struct ContentView: View {
                 .background(Color.white)
 
             // 1. Первое описание (серое) сразу под QR-кодом
-            Text("Покажите QR-код контроллеру")
+            Text("Покажите QR-код")
                 .font(.system(size: lerp(12, 14, t), weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
@@ -324,7 +341,7 @@ struct ContentView: View {
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
                     .foregroundColor(.black)
 
-                Text("Сумма 80 ₸")
+                Text("Сумма 100 ₸")
                     .font(.system(size: lerp(12, 14, t), weight: .light))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
@@ -402,10 +419,7 @@ struct ContentView: View {
         hideKeyboard()
         expanded = false
         drag = 0
-        
-        withAnimation(.easeOut(duration: 0.3)) { 
-            showCard = true 
-        }
+        withAnimation(.easeOut(duration: 0.3)) { showCard = true }
     }
 
     private func toggleExpanded() {
@@ -470,7 +484,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
             .frame(width: 580, height: 580)
         
         // 1. Первое описание для печати
-        Text("Покажите QR-код")
+        Text("Покажите QR-код контроллеру")
             .font(.system(size: 24, weight: .regular))
             .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
@@ -489,7 +503,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
 
-            Text("Сумма 100 ₸")
+            Text("Сумма 80 ₸")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
