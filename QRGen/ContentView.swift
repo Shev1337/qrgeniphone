@@ -336,7 +336,7 @@ struct ContentView: View {
                     VStack(spacing: 4) {
                         Image(systemName: "printer")
                             .font(.system(size: 18))
-                        Text("Печать")
+                        Text("Квитанция")
                             .font(.caption)
                     }
                     .foregroundColor(.black)
