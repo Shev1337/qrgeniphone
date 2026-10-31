@@ -87,7 +87,9 @@ struct ContentView: View {
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: 250, maxHeight: 250)
+                .frame(maxWidth: 270, maxHeight: 270)
+                .padding(12)
+                .background(Color.white)
                 .padding(.top, 4)
 
             if !caption.isEmpty {
@@ -146,7 +148,7 @@ func makeQR(from string: String) -> UIImage {
     let context = CIContext()
     let filter = CIFilter.qrCodeGenerator()
     filter.message = Data(string.utf8)
-    filter.correctionLevel = "M"
+    filter.correctionLevel = "H"
     guard let output = filter.outputImage else { return UIImage() }
     let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
     guard let cg = context.createCGImage(scaled, from: scaled.extent) else { return UIImage() }
