@@ -1,12 +1,30 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 
+struct SavedItem: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var link: String
+    var caption: String
+}
+
 struct ContentView: View {
     @AppStorage("savedLink") private var link = ""
     @AppStorage("savedCaption") private var caption = ""
+    @AppStorage("savedItems") private var savedData = ""
     @State private var showCard = false
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
+
+    private var items: [SavedItem] {
+        get { (try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? [] }
+    }
+
+    private func setItems(_ new: [SavedItem]) {
+        if let data = try? JSONEncoder().encode(new),
+           let str = String(data: data, encoding: .utf8) {
+            savedData = str
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -30,6 +48,8 @@ struct ContentView: View {
         .preferredColorScheme(.light)
     }
 
+    // MARK: - Главный экран
+
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("QR-генератор")
@@ -51,24 +71,109 @@ struct ContentView: View {
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            Button {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                withAnimation(.easeOut(duration: 0.3)) { showCard = true }
-            } label: {
-                Text("Создать QR-код")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(link.isEmpty ? Color(white: 0.75) : Color.black)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .disabled(link.isEmpty)
+            HStack(spacing: 12) {
+                Button {
+                    hideKeyboard()
+                    withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+                } label: {
+                    Text("Создать QR-код")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(link.isEmpty ? Color(white: 0.75) : Color.black)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(link.isEmpty)
 
-            Spacer()
+                Button {
+                    hideKeyboard()
+                    saveCurrent()
+                } label: {
+                    Image(systemName: "bookmark")
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 56, height: 52)
+                        .background(Color(white: 0.95))
+                        .foregroundColor(link.isEmpty ? Color(white: 0.7) : .black)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(link.isEmpty)
+            }
+
+            if !items.isEmpty {
+                Text("Сохранённые")
+                    .font(.headline)
+                    .foregroundColor(.black)
+                    .padding(.top, 8)
+
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(items) { item in
+                            row(item)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            } else {
+                Spacer()
+            }
         }
         .padding(.horizontal, 20)
     }
+
+    private func row(_ item: SavedItem) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                link = item.link
+                caption = item.caption
+                hideKeyboard()
+                withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.caption.isEmpty ? item.link : item.caption.uppercased())
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                        .lineLimit(1)
+                    if !item.caption.isEmpty {
+                        Text(item.link)
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button {
+                setItems(items.filter { $0.id != item.id })
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color(white: 0.55))
+                    .padding(8)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(white: 0.95))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func saveCurrent() {
+        let new = SavedItem(link: link, caption: caption)
+        var list = items
+        // не сохраняем дубликаты
+        list.removeAll { $0.link == new.link && $0.caption == new.caption }
+        list.insert(new, at: 0)
+        setItems(list)
+    }
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    // MARK: - Карточка с QR
 
     private func card(height: CGFloat) -> some View {
         let image = makeQR(from: link)
