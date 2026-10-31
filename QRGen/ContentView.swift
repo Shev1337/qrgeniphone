@@ -245,7 +245,7 @@ struct ContentView: View {
         let h = min(full, max(base - drag, full * 0.5))
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
-        let qrSide = lerp(200, min(size.width - 56, 330), t)
+        let qrSide = lerp(240, min(size.width - 56, 330), t)
         let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
@@ -280,7 +280,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 4)
 
-            Spacer(minLength: 2)
+            Spacer(minLength: 1)
 
             // QR-код
             Image(uiImage: image)
@@ -297,7 +297,7 @@ struct ContentView: View {
                 .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 8)
+                .padding(.top, 24)
                 .padding(.horizontal, 16)
 
             // 2. Основной текст (caption) с отступом
@@ -308,7 +308,7 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, 8)
+                    .padding(.top, 16)
                     .padding(.horizontal, 16)
             }
 
@@ -324,7 +324,7 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
-            .padding(.top, 8)
+            .padding(.top, 16)
             .padding(.horizontal, 16)
 
             Spacer(minLength: 8)
