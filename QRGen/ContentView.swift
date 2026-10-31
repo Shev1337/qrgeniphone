@@ -216,7 +216,7 @@ struct ContentView: View {
         let h = min(full, max(base - drag, full * 0.5))
         // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
-        let qrSide = lerp(235, min(size.width - 72, 360), t)
+        let qrSide = lerp(220, min(size.width - 72, 340), t)
 
         return VStack(spacing: 0) {
             // Полоска сверху: тянуть вверх — развернуть, вниз — свернуть/закрыть
@@ -249,24 +249,33 @@ struct ContentView: View {
                 }
             }
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 4)
 
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
                 .frame(width: qrSide, height: qrSide)
-                .padding(12)
+                .padding(10)
                 .background(Color.white)
+
+            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ (изменяйте текст здесь)
+            Text("Здесь будет ваше описание QR-кода")
+                .font(.system(size: lerp(12, 14, t), weight: .regular))
+                .foregroundColor(Color(white: 0.55))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .padding(.top, 6)
+                .padding(.horizontal, 16)
 
             if !caption.isEmpty {
                 Text(caption.uppercased())
-                    .font(.system(size: lerp(17, 24, t), weight: .semibold))
+                    .font(.system(size: lerp(16, 22, t), weight: .semibold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, lerp(14, 24, t))
+                    .padding(.top, lerp(8, 14, t))
                     .padding(.horizontal, 16)
             }
 
@@ -279,7 +288,7 @@ struct ContentView: View {
                     VStack(spacing: 5) {
                         Image(systemName: "printer")
                             .font(.system(size: 18))
-                        Text("Квитанция")
+                        Text("Печать")
                             .font(.caption)
                     }
                     .foregroundColor(.black)
@@ -378,7 +387,7 @@ func makeQR(from string: String) -> UIImage {
 
 @MainActor
 func printQR(image: UIImage, title: String, caption: String) {
-    let content = VStack(spacing: 40) {
+    let content = VStack(spacing: 30) {
         if !title.isEmpty {
             Text(title)
                 .font(.system(size: 52, weight: .semibold))
@@ -390,6 +399,13 @@ func printQR(image: UIImage, title: String, caption: String) {
             .resizable()
             .scaledToFit()
             .frame(width: 600, height: 600)
+        
+        // Серый текст для печати (изменяйте здесь под печать)
+        Text("Здесь будет ваше описание QR-кода")
+            .font(.system(size: 28, weight: .regular))
+            .foregroundColor(Color(white: 0.55))
+            .multilineTextAlignment(.center)
+
         if !caption.isEmpty {
             Text(caption.uppercased())
                 .font(.system(size: 56, weight: .bold))
