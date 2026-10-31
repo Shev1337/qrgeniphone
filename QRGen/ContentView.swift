@@ -243,10 +243,9 @@ struct ContentView: View {
         let collapsed = full * collapsedRatio
         let base = expanded ? full : collapsed
         let h = min(full, max(base - drag, full * 0.5))
-        // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
-        let qrSide = lerp(210, min(size.width - 56, 350), t)
+        let qrSide = lerp(220, min(size.width - 56, 360), t)
         let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
@@ -255,23 +254,22 @@ struct ContentView: View {
                 .fill(Color(white: 0.8))
                 .frame(width: 40, height: 5)
                 .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { toggleExpanded() }
 
-            HStack(alignment: .top) {
-                if title.isEmpty {
-                    Spacer()
-                } else {
-                    // Увеличенный заголовок сверху
+            HStack(alignment: .center) {
+                if !title.isEmpty {
+                    // Верхняя надпись строго в одну строчку с уменьшением масштаба при необходимости
                     Text(title)
-                        .font(.system(size: lerp(22, 30, t), weight: .bold))
+                        .font(.system(size: lerp(20, 26, t), weight: .bold))
                         .foregroundColor(.black)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 2)
+                } else {
+                    Spacer()
                 }
                 Button { close() } label: {
                     Image(systemName: "xmark")
@@ -280,54 +278,56 @@ struct ContentView: View {
                         .padding(8)
                 }
             }
+            .padding(.horizontal, 4)
 
-            Spacer(minLength: 2)
+            Spacer(minLength: 4)
 
+            // Сам QR-код стал чуть выше
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
                 .frame(width: qrSide, height: qrSide)
-                .padding(6)
+                .padding(4)
                 .background(Color.white)
 
-            // 1. Увеличенный серый текст под QR-кодом
-            Text("Покажите QR-код контроллеру")
-                .font(.system(size: lerp(13, 16, t), weight: .regular))
+            // 1. Первое описание (серое)
+            Text("Покажите Qr-код контроллеру")
+                .font(.system(size: lerp(12, 15, t), weight: .regular))
                 .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 4)
+                .padding(.top, 8)
                 .padding(.horizontal, 16)
 
-            // 2. Увеличенный черный жирный текст
+            // 2. Черный жирный текст подписи
             if !caption.isEmpty {
                 Text(caption.uppercased())
-                    .font(.system(size: lerp(18, 24, t), weight: .bold))
+                    .font(.system(size: lerp(16, 22, t), weight: .bold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, lerp(4, 8, t))
+                    .padding(.top, 6)
                     .padding(.horizontal, 16)
             }
 
-            // 3. Дата и время генерации кода
+            // 3. Дата и время генерации (черная, одинакового размера со вторым описанием)
             Text(currentDateString)
-                .font(.system(size: lerp(11, 13, t), weight: .regular))
-                .foregroundColor(Color(white: 0.6))
-                .padding(.top, 3)
+                .font(.system(size: lerp(12, 14, t), weight: .regular))
+                .foregroundColor(.black)
+                .padding(.top, 8)
 
-            // 4. Второе описание: черное, тонкое (изменяйте текст здесь)
-            Text("Сумма 80 ₸")
-                .font(.system(size: lerp(11, 13, t), weight: .light))
+            // 4. Второе описание (тоже черное и тонкое, с увеличенным отступом)
+            Text("Покажите Qr-код контроллеру")
+                .font(.system(size: lerp(12, 14, t), weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 2)
+                .padding(.top, 6)
                 .padding(.horizontal, 16)
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 12)
 
             HStack(spacing: 44) {
                 Button {
@@ -336,7 +336,7 @@ struct ContentView: View {
                     VStack(spacing: 4) {
                         Image(systemName: "printer")
                             .font(.system(size: 18))
-                        Text("Квитанция")
+                        Text("Печать")
                             .font(.caption)
                     }
                     .foregroundColor(.black)
@@ -435,11 +435,12 @@ func makeQR(from string: String) -> UIImage {
 
 @MainActor
 func printQR(image: UIImage, title: String, caption: String, dateString: String) {
-    let content = VStack(spacing: 16) {
+    let content = VStack(spacing: 18) {
         if !title.isEmpty {
             Text(title)
-                .font(.system(size: 54, weight: .bold))
+                .font(.system(size: 50, weight: .bold))
                 .foregroundColor(.black)
+                .lineLimit(1)
                 .multilineTextAlignment(.center)
         }
         
@@ -447,29 +448,29 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .frame(width: 620, height: 620)
+            .frame(width: 640, height: 640)
         
         // Серый текст под QR для печати
         Text("Здесь ваше первое описание QR-кода")
-            .font(.system(size: 28, weight: .regular))
+            .font(.system(size: 26, weight: .regular))
             .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
 
         if !caption.isEmpty {
             Text(caption.uppercased())
-                .font(.system(size: 54, weight: .bold))
+                .font(.system(size: 50, weight: .bold))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
 
-        // Дата и время для печати
+        // Дата для печати (чёрная)
         Text(dateString)
-            .font(.system(size: 22, weight: .regular))
-            .foregroundColor(Color(white: 0.6))
+            .font(.system(size: 24, weight: .regular))
+            .foregroundColor(.black)
 
-        // Второе описание: черное, тонкое для печати
+        // Второе описание для печати (чёрное, тонкое)
         Text("Дополнительное описание код-метки")
-            .font(.system(size: 22, weight: .light))
+            .font(.system(size: 24, weight: .light))
             .foregroundColor(.black)
             .multilineTextAlignment(.center)
     }
@@ -491,7 +492,6 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
 }
 
 /// Делает QR плотнее: добавляет к данным «хвост», чтобы клеток стало больше.
-/// Для сайтов хвост идёт после #, его сайт игнорирует.
 func densePayload(_ input: String, level: Int) -> String {
     let link = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard level > 0, !link.isEmpty else { return link }
