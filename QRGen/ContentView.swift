@@ -34,10 +34,10 @@ struct ContentView: View {
     @AppStorage("density") private var density = 0
 
     @State private var showCard = false
-    @State private var showScanner = false // Состояние для открытия сканера
+    @State private var showScanner = false
     @State private var expanded = false
     @State private var drag: CGFloat = 0
-    @State private var originalBrightness: CGFloat = 1.0 // Для сохранения прежней яркости
+    @State private var originalBrightness: CGFloat = 1.0
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
@@ -105,13 +105,27 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.light)
-        // Модальное окно встроенного сканера камер
         .sheet(isPresented: $showScanner) {
             QRScannerView { scannedString in
-                link = scannedString
+                handleScannedLink(scannedString)
                 showScanner = false
-                openCard() // Автоматически открываем карточку с новым отсканированным сайтом
+                openCard()
             }
+        }
+    }
+
+    // MARK: - Логика автоподстановки и сохранения после сканирования
+
+    private func handleScannedLink(_ scannedLink: String) {
+        link = scannedLink
+        
+        // 1. Ищем, сканировали ли мы эту ссылку ранее в сохраненных
+        if let existingItem = items.first(where: { $0.link == scannedLink }) {
+            caption = existingItem.caption
+            title = existingItem.title
+        } else if !caption.isEmpty || !title.isEmpty {
+            // 2. Если ранее этот QR не сканировался, но текст подписи уже был введён вручную перед сканированием — сохраняем
+            saveCurrent()
         }
     }
 
@@ -124,7 +138,6 @@ struct ContentView: View {
                 .foregroundColor(.black)
                 .padding(.top, 24)
 
-            // Поле ссылки + Кнопка сканирования прямо внутри поля или рядом
             HStack(spacing: 8) {
                 TextField("Ссылка на сайт", text: $link)
                     .textInputAutocapitalization(.never)
@@ -134,7 +147,6 @@ struct ContentView: View {
                     .background(Color(white: 0.95))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                // Кнопка открытия сканера камер
                 Button {
                     showScanner = true
                 } label: {
@@ -272,7 +284,7 @@ struct ContentView: View {
     private func saveCurrent() {
         let new = SavedItem(link: link, caption: caption, title: title)
         var list = items
-        list.removeAll { $0.link == new.link && $0.caption == new.caption && $0.title == new.title }
+        list.removeAll { $0.link == new.link }
         list.insert(new, at: 0)
         setItems(list)
     }
@@ -438,7 +450,6 @@ struct ContentView: View {
         expanded = false
         drag = 0
         
-        // Сохраняем текущую яркость и выкручиваем на максимум
         originalBrightness = UIScreen.main.brightness
         UIScreen.main.brightness = 1.0
         
@@ -455,7 +466,6 @@ struct ContentView: View {
     }
 
     private func close() {
-        // Возвращаем исходную яркость экрана при закрытии
         UIScreen.main.brightness = originalBrightness
         
         withAnimation(.easeIn(duration: 0.25)) { 
