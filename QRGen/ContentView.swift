@@ -117,10 +117,7 @@ struct ContentView: View {
         }
         .alert("Найден сохранённый QR-код", isPresented: $showMatchAlert, presenting: pendingItem) { item in
             Button("Использовать") {
-                link = item.link
-                caption = item.caption
-                title = item.title
-                openCard()
+                touchItem(item)
             }
             Button("Отмена", role: .cancel) {
                 pendingItem = nil
@@ -129,17 +126,39 @@ struct ContentView: View {
             let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : "Без подписи")
             Text("Применить сохранённую подпись:\n«\(textToShow)»?")
         }
+        // Умное переключение яркости по состоянию карточки
+        .onChange(of: showCard) { isOpen in
+            if isOpen {
+                originalBrightness = UIScreen.main.brightness
+                UIScreen.main.brightness = 1.0
+            } else {
+                UIScreen.main.brightness = originalBrightness
+            }
+        }
+    }
+
+    // MARK: - Перемещение используемого билета наверх
+
+    private func touchItem(_ item: SavedItem) {
+        link = item.link
+        caption = item.caption
+        title = item.title
+
+        var list = items
+        list.removeAll { $0.link == item.link }
+        list.insert(item, at: 0)
+        setItems(list)
+
+        openCard()
     }
 
     // MARK: - Проверка сканирования
 
     private func handleScannedLink(_ scannedLink: String) {
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
-            // Если этот QR уже есть — сохраняем во временное состояние и запрашиваем подтверждение
             pendingItem = existingItem
             showMatchAlert = true
         } else {
-            // Если QR новый — открываем сразу
             link = scannedLink
             if !caption.isEmpty || !title.isEmpty {
                 saveCurrent()
@@ -265,10 +284,7 @@ struct ContentView: View {
 
         return HStack(spacing: 12) {
             Button {
-                link = item.link
-                caption = item.caption
-                title = item.title
-                openCard()
+                touchItem(item)
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(primary)
@@ -469,9 +485,6 @@ struct ContentView: View {
         expanded = false
         drag = 0
         
-        originalBrightness = UIScreen.main.brightness
-        UIScreen.main.brightness = 1.0
-        
         withAnimation(.easeOut(duration: 0.3)) { 
             showCard = true 
         }
@@ -485,8 +498,6 @@ struct ContentView: View {
     }
 
     private func close() {
-        UIScreen.main.brightness = originalBrightness
-        
         withAnimation(.easeIn(duration: 0.25)) { 
             showCard = false 
         }
