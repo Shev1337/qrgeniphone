@@ -5,18 +5,41 @@ struct SavedItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var link: String
     var caption: String
+    var title: String = ""
+
+    enum CodingKeys: String, CodingKey { case id, link, caption, title }
+
+    init(link: String, caption: String, title: String) {
+        self.link = link
+        self.caption = caption
+        self.title = title
+    }
+
+    // Старые сохранения (без заголовка) продолжают читаться
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        link = (try? c.decode(String.self, forKey: .link)) ?? ""
+        caption = (try? c.decode(String.self, forKey: .caption)) ?? ""
+        title = (try? c.decode(String.self, forKey: .title)) ?? ""
+    }
 }
 
 struct ContentView: View {
     @AppStorage("savedLink") private var link = ""
     @AppStorage("savedCaption") private var caption = ""
+    @AppStorage("savedTitle") private var title = ""
     @AppStorage("savedItems") private var savedData = ""
+
     @State private var showCard = false
+    @State private var expanded = false
+    @State private var drag: CGFloat = 0
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
+    private let collapsedRatio: CGFloat = 0.72
 
     private var items: [SavedItem] {
-        get { (try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? [] }
+        (try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? []
     }
 
     private func setItems(_ new: [SavedItem]) {
@@ -24,6 +47,10 @@ struct ContentView: View {
            let str = String(data: data, encoding: .utf8) {
             savedData = str
         }
+    }
+
+    private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {
+        a + (b - a) * t
     }
 
     var body: some View {
@@ -39,7 +66,7 @@ struct ContentView: View {
                         .onTapGesture { close() }
                         .zIndex(1)
 
-                    card(height: geo.size.height * 0.62)
+                    card(size: geo.size)
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
                 }
@@ -51,7 +78,7 @@ struct ContentView: View {
     // MARK: - Главный экран
 
     private var form: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("QR-генератор")
                 .font(.largeTitle.bold())
                 .foregroundColor(.black)
@@ -65,6 +92,11 @@ struct ContentView: View {
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
+            TextField("Текст сверху (необязательно)", text: $title)
+                .padding()
+                .background(Color(white: 0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
             TextField("Подпись под QR-кодом", text: $caption)
                 .textInputAutocapitalization(.characters)
                 .padding()
@@ -73,8 +105,7 @@ struct ContentView: View {
 
             HStack(spacing: 12) {
                 Button {
-                    hideKeyboard()
-                    withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+                    openCard()
                 } label: {
                     Text("Создать QR-код")
                         .font(.headline)
@@ -123,19 +154,22 @@ struct ContentView: View {
     }
 
     private func row(_ item: SavedItem) -> some View {
-        HStack(spacing: 12) {
+        let primary: String = !item.caption.isEmpty ? item.caption.uppercased()
+            : (!item.title.isEmpty ? item.title : item.link)
+
+        return HStack(spacing: 12) {
             Button {
                 link = item.link
                 caption = item.caption
-                hideKeyboard()
-                withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+                title = item.title
+                openCard()
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.caption.isEmpty ? item.link : item.caption.uppercased())
+                    Text(primary)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.black)
                         .lineLimit(1)
-                    if !item.caption.isEmpty {
+                    if primary != item.link {
                         Text(item.link)
                             .font(.footnote)
                             .foregroundColor(Color(white: 0.5))
@@ -161,10 +195,9 @@ struct ContentView: View {
     }
 
     private func saveCurrent() {
-        let new = SavedItem(link: link, caption: caption)
+        let new = SavedItem(link: link, caption: caption, title: title)
         var list = items
-        // не сохраняем дубликаты
-        list.removeAll { $0.link == new.link && $0.caption == new.caption }
+        list.removeAll { $0.link == new.link && $0.caption == new.caption && $0.title == new.title }
         list.insert(new, at: 0)
         setItems(list)
     }
@@ -175,11 +208,39 @@ struct ContentView: View {
 
     // MARK: - Карточка с QR
 
-    private func card(height: CGFloat) -> some View {
+    private func card(size: CGSize) -> some View {
         let image = makeQR(from: link)
+        let full = size.height
+        let collapsed = full * collapsedRatio
+        let base = expanded ? full : collapsed
+        let h = min(full, max(base - drag, full * 0.5))
+        // 0 — обычный размер, 1 — на весь экран
+        let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
+        let qrSide = lerp(235, min(size.width - 72, 360), t)
+
         return VStack(spacing: 0) {
-            HStack {
-                Spacer()
+            // Полоска сверху: тянуть вверх — развернуть, вниз — свернуть/закрыть
+            Capsule()
+                .fill(Color(white: 0.8))
+                .frame(width: 40, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { toggleExpanded() }
+
+            HStack(alignment: .top) {
+                if title.isEmpty {
+                    Spacer()
+                } else {
+                    Text(title)
+                        .font(.system(size: lerp(20, 28, t), weight: .semibold))
+                        .foregroundColor(.black)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 6)
+                }
                 Button { close() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .medium))
@@ -187,31 +248,33 @@ struct ContentView: View {
                         .padding(8)
                 }
             }
-            .padding(.top, 10)
+
+            Spacer(minLength: 6)
 
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: 270, maxHeight: 270)
+                .frame(width: qrSide, height: qrSide)
                 .padding(12)
                 .background(Color.white)
-                .padding(.top, 4)
 
             if !caption.isEmpty {
                 Text(caption.uppercased())
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: lerp(17, 24, t), weight: .semibold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
-                    .padding(.top, 20)
-                    .padding(.horizontal, 24)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.6)
+                    .padding(.top, lerp(14, 24, t))
+                    .padding(.horizontal, 16)
             }
 
             Spacer(minLength: 12)
 
             HStack(spacing: 44) {
                 Button {
-                    printQR(image: image, caption: caption)
+                    printQR(image: image, title: title, caption: caption)
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "printer")
@@ -239,13 +302,51 @@ struct ContentView: View {
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
-        .frame(height: height)
+        .frame(height: h, alignment: .top)
         .background(
             TopRounded(radius: 28)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.12), radius: 12, y: -2)
                 .ignoresSafeArea(edges: .bottom)
         )
+        .contentShape(Rectangle())
+        .gesture(dragGesture)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { drag = $0.translation.height }
+            .onEnded { value in
+                let dy = value.translation.height
+                let predicted = value.predictedEndTranslation.height
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    if expanded {
+                        if dy > 100 || predicted > 250 { expanded = false }
+                        drag = 0
+                    } else if dy < -50 || predicted < -200 {
+                        expanded = true
+                        drag = 0
+                    } else if dy > 130 || predicted > 300 {
+                        showCard = false
+                    } else {
+                        drag = 0
+                    }
+                }
+            }
+    }
+
+    private func openCard() {
+        hideKeyboard()
+        expanded = false
+        drag = 0
+        withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+    }
+
+    private func toggleExpanded() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            expanded.toggle()
+            drag = 0
+        }
     }
 
     private func close() {
@@ -276,8 +377,14 @@ func makeQR(from string: String) -> UIImage {
 }
 
 @MainActor
-func printQR(image: UIImage, caption: String) {
+func printQR(image: UIImage, title: String, caption: String) {
     let content = VStack(spacing: 40) {
+        if !title.isEmpty {
+            Text(title)
+                .font(.system(size: 52, weight: .semibold))
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+        }
         Image(uiImage: image)
             .interpolation(.none)
             .resizable()
