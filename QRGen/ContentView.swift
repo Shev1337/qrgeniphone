@@ -251,19 +251,10 @@ struct ContentView: View {
         let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
-            // Полоска сверху
-            Capsule()
-                .fill(Color(white: 0.8))
-                .frame(width: 40, height: 5)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture { toggleExpanded() }
-
+            
+            // ВЕРХНЯЯ ШАПКА: Текст слева вместо полоски, кнопка закрытия справа
             HStack(alignment: .center) {
                 if !title.isEmpty {
-                    // Верхняя надпись в одну строчку
                     Text(title)
                         .font(.system(size: lerp(20, 26, t), weight: .bold))
                         .foregroundColor(.black)
@@ -281,6 +272,19 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 4)
+            .padding(.top, 8)
+
+            // ИКОНКА УСПЕХА: Зеленый кружок с галочкой и подпись «Успешно»
+            VStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: lerp(32, 40, t)))
+                    .foregroundColor(.green)
+                
+                Text("Успешно")
+                    .font(.system(size: lerp(12, 14, t), weight: .medium))
+                    .foregroundColor(Color(white: 0.5))
+            }
+            .padding(.top, 4)
 
             Spacer(minLength: 1)
 
@@ -393,17 +397,16 @@ struct ContentView: View {
                 }
             }
     }
-private func openCard() {
-    hideKeyboard()
-    expanded = false
-    drag = 0
-    
-    // Если плотность обычная (0), но мы хотим рандомизировать даже её, 
-    // либо если плотность уже высокая — добавляем уникальный случайный хвост через пробел или #
-    withAnimation(.easeOut(duration: 0.3)) { 
-        showCard = true 
+
+    private func openCard() {
+        hideKeyboard()
+        expanded = false
+        drag = 0
+        
+        withAnimation(.easeOut(duration: 0.3)) { 
+            showCard = true 
+        }
     }
-}
 
     private func toggleExpanded() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -450,6 +453,16 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
         
+        // Галочка успеха при печати
+        VStack(spacing: 4) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 36))
+                .foregroundColor(.green)
+            Text("Успешно")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color(white: 0.5))
+        }
+        
         Image(uiImage: image)
             .interpolation(.none)
             .resizable()
@@ -457,7 +470,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
             .frame(width: 580, height: 580)
         
         // 1. Первое описание для печати
-        Text("Здесь ваше первое описание QR-кода")
+        Text("Покажите QR-код")
             .font(.system(size: 24, weight: .regular))
             .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
@@ -476,7 +489,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
 
-            Text("Дополнительное описание код-метки")
+            Text("Сумма 100 ₸")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
