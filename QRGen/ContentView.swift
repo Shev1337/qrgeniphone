@@ -39,6 +39,10 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
     @State private var originalBrightness: CGFloat = 1.0
 
+    // Состояния для подтверждения найденного QR
+    @State private var showMatchAlert = false
+    @State private var pendingItem: SavedItem? = nil
+
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
 
@@ -107,25 +111,40 @@ struct ContentView: View {
         .preferredColorScheme(.light)
         .sheet(isPresented: $showScanner) {
             QRScannerView { scannedString in
-                handleScannedLink(scannedString)
                 showScanner = false
+                handleScannedLink(scannedString)
+            }
+        }
+        .alert("Найден сохранённый QR-код", isPresented: $showMatchAlert, presenting: pendingItem) { item in
+            Button("Использовать") {
+                link = item.link
+                caption = item.caption
+                title = item.title
                 openCard()
             }
+            Button("Отмена", role: .cancel) {
+                pendingItem = nil
+            }
+        } message: { item in
+            let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : "Без подписи")
+            Text("Применить сохранённую подпись:\n«\(textToShow)»?")
         }
     }
 
-    // MARK: - Логика автоподстановки и сохранения после сканирования
+    // MARK: - Проверка сканирования
 
     private func handleScannedLink(_ scannedLink: String) {
-        link = scannedLink
-        
-        // 1. Ищем, сканировали ли мы эту ссылку ранее в сохраненных
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
-            caption = existingItem.caption
-            title = existingItem.title
-        } else if !caption.isEmpty || !title.isEmpty {
-            // 2. Если ранее этот QR не сканировался, но текст подписи уже был введён вручную перед сканированием — сохраняем
-            saveCurrent()
+            // Если этот QR уже есть — сохраняем во временное состояние и запрашиваем подтверждение
+            pendingItem = existingItem
+            showMatchAlert = true
+        } else {
+            // Если QR новый — открываем сразу
+            link = scannedLink
+            if !caption.isEmpty || !title.isEmpty {
+                saveCurrent()
+            }
+            openCard()
         }
     }
 
