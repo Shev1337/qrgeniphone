@@ -2,8 +2,8 @@ import SwiftUI
 import CoreImage.CIFilterBuiltins
 
 struct ContentView: View {
-    @State private var link = ""
-    @State private var caption = ""
+    @AppStorage("savedLink") private var link = ""
+    @AppStorage("savedCaption") private var caption = ""
     @State private var showCard = false
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
@@ -46,6 +46,7 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
             TextField("Подпись под QR-кодом", text: $caption)
+                .textInputAutocapitalization(.characters)
                 .padding()
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -93,7 +94,7 @@ struct ContentView: View {
                 .padding(.top, 4)
 
             if !caption.isEmpty {
-                Text(caption)
+                Text(caption.uppercased())
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
@@ -105,7 +106,7 @@ struct ContentView: View {
 
             ShareLink(
                 item: Image(uiImage: image),
-                preview: SharePreview(caption.isEmpty ? "QR-код" : caption, image: Image(uiImage: image))
+                preview: SharePreview(caption.isEmpty ? "QR-код" : caption.uppercased(), image: Image(uiImage: image))
             ) {
                 VStack(spacing: 6) {
                     Image(systemName: "square.and.arrow.up")
