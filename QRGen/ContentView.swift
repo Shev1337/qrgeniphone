@@ -36,7 +36,7 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
-    private let collapsedRatio: CGFloat = 0.72
+    private let collapsedRatio: CGFloat = 0.82
 
     private var items: [SavedItem] {
         (try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? []
