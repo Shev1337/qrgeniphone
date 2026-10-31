@@ -1,5 +1,7 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
+import AVFoundation
+import VisionKit
 
 struct SavedItem: Codable, Identifiable, Equatable {
     var id = UUID()
@@ -15,7 +17,6 @@ struct SavedItem: Codable, Identifiable, Equatable {
         self.title = title
     }
 
-    // Старые сохранения (без заголовка) продолжают читаться
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
@@ -33,6 +34,7 @@ struct ContentView: View {
     @AppStorage("density") private var density = 0
 
     @State private var showCard = false
+    @State private var showScanner = false // Состояние для открытия сканера
     @State private var expanded = false
     @State private var drag: CGFloat = 0
 
@@ -54,7 +56,6 @@ struct ContentView: View {
         a + (b - a) * t
     }
 
-    // Форматирование текущей даты и времени
     private var formattedCurrentDate: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
@@ -69,24 +70,21 @@ struct ContentView: View {
                 form
 
                 if showCard {
-                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И ЗЕЛЕНОЙ ГАЛОЧКОЙ
                     ZStack(alignment: .top) {
                         backdrop
                             .ignoresSafeArea()
                             .onTapGesture { close() }
 
                         VStack(spacing: 8) {
-                            // Текст в самом верху фона с меньшим отступом
                             Text("Ваш текст сверху на фоне")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .padding(.top, 12) // Уменьшенный отступ от верха экрана
+                                .padding(.top, 12)
 
-                            // Зелёная иконка с белой галочкой и надпись «Успешно»
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
-                                    .foregroundStyle(.white, .green) // Белая галочка на зелёном фоне
+                                    .foregroundStyle(.white, .green)
                                 Text("Успешно")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.black)
@@ -97,15 +95,22 @@ struct ContentView: View {
                     .transition(.opacity)
                     .zIndex(1)
 
-                    // САМО ВЫПАДАЮЩЕЕ ОКНО (опущено ниже, чтобы не закрывать «Успешно»)
                     card(size: geo.size)
-                        .padding(.top, 130) // <--- Окно опущено ниже
+                        .padding(.top, 130)
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
                 }
             }
         }
         .preferredColorScheme(.light)
+        // Модальное окно встроенного сканера камер
+        .sheet(isPresented: $showScanner) {
+            QRScannerView { scannedString in
+                link = scannedString
+                showScanner = false
+                openCard() // Автоматически открываем карточку с новым отсканированным сайтом
+            }
+        }
     }
 
     // MARK: - Главный экран
@@ -117,13 +122,28 @@ struct ContentView: View {
                 .foregroundColor(.black)
                 .padding(.top, 24)
 
-            TextField("Ссылка на сайт", text: $link)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
-                .padding()
-                .background(Color(white: 0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            // Поле ссылки + Кнопка сканирования прямо внутри поля или рядом
+            HStack(spacing: 8) {
+                TextField("Ссылка на сайт", text: $link)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .padding()
+                    .background(Color(white: 0.95))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                // Кнопка открытия сканера камер
+                Button {
+                    showScanner = true
+                } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 22, weight: .medium))
+                        .frame(width: 52, height: 52)
+                        .background(Color(white: 0.95))
+                        .foregroundColor(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
 
             TextField("Текст сверху (необязательно)", text: $title)
                 .padding()
@@ -274,7 +294,6 @@ struct ContentView: View {
         let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
-            // Полоска сверху на карточке
             Capsule()
                 .fill(Color(white: 0.8))
                 .frame(width: 40, height: 5)
@@ -306,7 +325,6 @@ struct ContentView: View {
 
             Spacer(minLength: 1)
 
-            // QR-код
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
@@ -315,7 +333,6 @@ struct ContentView: View {
                 .padding(4)
                 .background(Color.white)
 
-            // 1. Первое описание (серое) сразу под QR-кодом
             Text("Покажите QR-код")
                 .font(.system(size: lerp(12, 14, t), weight: .regular))
                 .foregroundColor(Color(white: 0.45))
@@ -324,7 +341,6 @@ struct ContentView: View {
                 .padding(.top, 32)
                 .padding(.horizontal, 16)
 
-            // 2. Основной текст (caption) с отступом
             if !caption.isEmpty {
                 Text(caption.uppercased())
                     .font(.system(size: lerp(16, 22, t), weight: .bold))
@@ -336,7 +352,6 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
             }
 
-            // 3 и 4. Дата и второе описание объединены без отступа между ними
             VStack(spacing: 2) {
                 Text(currentDateString)
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
@@ -435,6 +450,53 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Сканер QR (VisionKit DataScanner)
+
+struct QRScannerView: UIViewControllerRepresentable {
+    var onScan: (String) -> Void
+
+    func makeUIViewController(context: Context) -> DataScannerViewController {
+        let scanner = DataScannerViewController(
+            recognizedDataTypes: [.barcode(symbologies: [.qr])],
+            qualityLevel: .balanced,
+            recognizesMultipleItems: false,
+            isGuidanceEnabled: true,
+            isHighlightingEnabled: true
+        )
+        scanner.delegate = context.coordinator
+        try? scanner.startScanning()
+        return scanner
+    }
+
+    func updateUIViewController(_ uiViewController: DataScannerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScan: onScan)
+    }
+
+    class Coordinator: NSObject, DataScannerViewControllerDelegate {
+        var onScan: (String) -> Void
+        var hasScanned = false
+
+        init(onScan: @escaping (String) -> Void) {
+            self.onScan = onScan
+        }
+
+        func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
+            guard !hasScanned else { return }
+            for item in addedItems {
+                if case let .barcode(code) = item, let payload = code.payloadStringValue {
+                    hasScanned = true
+                    DispatchQueue.main.async {
+                        self.onScan(payload)
+                    }
+                    break
+                }
+            }
+        }
+    }
+}
+
 struct TopRounded: Shape {
     var radius: CGFloat
     func path(in rect: CGRect) -> Path {
@@ -468,7 +530,6 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
         
-        // Зелёная галочка с белой галкой при печати
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
@@ -484,13 +545,11 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
             .scaledToFit()
             .frame(width: 580, height: 580)
         
-        // 1. Первое описание для печати
         Text("Покажите QR-код")
             .font(.system(size: 24, weight: .regular))
             .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
 
-        // 2. Основной текст (caption) для печати
         if !caption.isEmpty {
             Text(caption.uppercased())
                 .font(.system(size: 48, weight: .bold))
@@ -498,7 +557,6 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
 
-        // 3 и 4. Дата и второе описание без отступа между ними для печати
         VStack(spacing: 4) {
             Text(dateString)
                 .font(.system(size: 22, weight: .regular))
@@ -527,7 +585,6 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
     controller.present(animated: true)
 }
 
-/// Делает QR плотнее: добавляет к данным «хвост», чтобы клеток стало больше.
 func densePayload(_ input: String, level: Int) -> String {
     let link = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard level > 0, !link.isEmpty else { return link }
