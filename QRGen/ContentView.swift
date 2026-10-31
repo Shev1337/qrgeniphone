@@ -334,9 +334,9 @@ struct ContentView: View {
                     printQR(image: image, title: title, caption: caption, dateString: currentDateString)
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: "printer")
+                        Image(systemName: "receipt")
                             .font(.system(size: 18))
-                        Text("Печать")
+                        Text("Квитанция")
                             .font(.caption)
                     }
                     .foregroundColor(.black)
