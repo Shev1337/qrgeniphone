@@ -69,37 +69,37 @@ struct ContentView: View {
                 form
 
                 if showCard {
-                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И ЧЁРНОЙ ГАЛОЧКОЙ
+                    // ФОНОВЫЙ ЭКРАН С НАДПИСЬЮ СВЕРХУ И ЗЕЛЕНОЙ ГАЛОЧКОЙ
                     ZStack(alignment: .top) {
                         backdrop
                             .ignoresSafeArea()
                             .onTapGesture { close() }
 
-                        VStack(spacing: 12) {
-                            // Текст в самом верху фона
+                        VStack(spacing: 8) {
+                            // Текст в самом верху фона с меньшим отступом
                             Text("Ваш текст сверху на фоне")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .padding(.top, 24)
+                                .padding(.top, 12) // Уменьшенный отступ от верха экрана
 
-                            // Чёрная иконка с галочкой и надпись «Успешно» (той же толщины)
-                            VStack(spacing: 6) {
+                            // Зелёная иконка с белой галочкой и надпись «Успешно»
+                            VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 64))
-                                    .foregroundColor(.green) // Чёрный цвет иконки
+                                    .font(.system(size: 60))
+                                    .foregroundStyle(.white, .green) // Белая галочка на зелёном фоне
                                 Text("Успешно")
-                                    .font(.system(size: 16, weight: .semibold)) // Тот же вес, что у верхнего текста
-                                    .foregroundColor(.black) // Чёрный цвет текста
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.black)
                             }
-                            .padding(.top, 10)
+                            .padding(.top, 6)
                         }
                     }
                     .transition(.opacity)
                     .zIndex(1)
 
-                    // САМО ВЫПАДАЮЩЕЕ ОКНО (опущено ниже за счет отступа .padding(.top, 40))
+                    // САМО ВЫПАДАЮЩЕЕ ОКНО (опущено ниже, чтобы не закрывать «Успешно»)
                     card(size: geo.size)
-                        .padding(.top, 40) // <--- Сдвигает всю карточку ниже на экране
+                        .padding(.top, 130) // <--- Окно опущено ниже
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
                 }
@@ -468,11 +468,11 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
         
-        // Чёрная галочка успеха при печати
+        // Зелёная галочка с белой галкой при печати
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundColor(.black)
+                .foregroundStyle(.white, .green)
             Text("Успешно")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.black)
