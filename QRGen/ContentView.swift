@@ -37,7 +37,6 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
-    // Высота окна увеличена (0.82)
     private let collapsedRatio: CGFloat = 0.82
 
     private var items: [SavedItem] {
@@ -53,6 +52,14 @@ struct ContentView: View {
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {
         a + (b - a) * t
+    }
+
+    // Форматирование текущей даты и времени
+    private var formattedCurrentDate: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM yyyy HH:mm"
+        return formatter.string(from: Date())
     }
 
     var body: some View {
@@ -239,16 +246,16 @@ struct ContentView: View {
         // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
-        // Увеличенный QR-код
-        let qrSide = lerp(230, min(size.width - 56, 390), t)
+        let qrSide = lerp(210, min(size.width - 56, 350), t)
+        let currentDateString = formattedCurrentDate
 
         return VStack(spacing: 0) {
-            // Полоска сверху: тянуть вверх — развернуть, вниз — свернуть/закрыть
+            // Полоска сверху
             Capsule()
                 .fill(Color(white: 0.8))
                 .frame(width: 40, height: 5)
                 .padding(.top, 8)
-                .padding(.bottom, 6)
+                .padding(.bottom, 4)
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { toggleExpanded() }
@@ -257,13 +264,14 @@ struct ContentView: View {
                 if title.isEmpty {
                     Spacer()
                 } else {
+                    // Увеличенный заголовок сверху
                     Text(title)
-                        .font(.system(size: lerp(18, 26, t), weight: .semibold))
+                        .font(.system(size: lerp(22, 30, t), weight: .bold))
                         .foregroundColor(.black)
                         .lineLimit(2)
                         .minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
+                        .padding(.top, 2)
                 }
                 Button { close() } label: {
                     Image(systemName: "xmark")
@@ -280,34 +288,50 @@ struct ContentView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: qrSide, height: qrSide)
-                .padding(8)
+                .padding(6)
                 .background(Color.white)
 
-            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ (изменяйте этот текст при необходимости)
-            Text("Здесь будет ваше описание QR-кода")
-                .font(.system(size: lerp(11, 13, t), weight: .regular))
-                .foregroundColor(Color(white: 0.55))
+            // 1. Увеличенный серый текст под QR-кодом
+            Text("Покажите QR-код контроллеру")
+                .font(.system(size: lerp(13, 16, t), weight: .regular))
+                .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 4)
                 .padding(.horizontal, 16)
 
+            // 2. Увеличенный черный жирный текст
             if !caption.isEmpty {
                 Text(caption.uppercased())
-                    .font(.system(size: lerp(15, 20, t), weight: .semibold))
+                    .font(.system(size: lerp(18, 24, t), weight: .bold))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, lerp(6, 10, t))
+                    .padding(.top, lerp(4, 8, t))
                     .padding(.horizontal, 16)
             }
 
-            Spacer(minLength: 8)
+            // 3. Дата и время генерации кода
+            Text(currentDateString)
+                .font(.system(size: lerp(11, 13, t), weight: .regular))
+                .foregroundColor(Color(white: 0.6))
+                .padding(.top, 3)
+
+            // 4. Второе описание: черное, тонкое (изменяйте текст здесь)
+            Text("Сумма 80 ₸")
+                .font(.system(size: lerp(11, 13, t), weight: .light))
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .padding(.top, 2)
+                .padding(.horizontal, 16)
+
+            Spacer(minLength: 6)
 
             HStack(spacing: 44) {
                 Button {
-                    printQR(image: image, title: title, caption: caption)
+                    printQR(image: image, title: title, caption: caption, dateString: currentDateString)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "printer")
@@ -410,34 +434,46 @@ func makeQR(from string: String) -> UIImage {
 }
 
 @MainActor
-func printQR(image: UIImage, title: String, caption: String) {
-    let content = VStack(spacing: 24) {
+func printQR(image: UIImage, title: String, caption: String, dateString: String) {
+    let content = VStack(spacing: 16) {
         if !title.isEmpty {
             Text(title)
-                .font(.system(size: 48, weight: .semibold))
+                .font(.system(size: 54, weight: .bold))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
+        
         Image(uiImage: image)
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .frame(width: 700, height: 700)
+            .frame(width: 620, height: 620)
         
         // Серый текст под QR для печати
-        Text("Покажите QR-код контроллеру")
-            .font(.system(size: 34, weight: .regular))
-            .foregroundColor(Color(white: 0.55))
+        Text("Здесь ваше первое описание QR-кода")
+            .font(.system(size: 28, weight: .regular))
+            .foregroundColor(Color(white: 0.45))
             .multilineTextAlignment(.center)
 
         if !caption.isEmpty {
             Text(caption.uppercased())
-                .font(.system(size: 52, weight: .bold))
+                .font(.system(size: 54, weight: .bold))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
+
+        // Дата и время для печати
+        Text(dateString)
+            .font(.system(size: 22, weight: .regular))
+            .foregroundColor(Color(white: 0.6))
+
+        // Второе описание: черное, тонкое для печати
+        Text("Дополнительное описание код-метки")
+            .font(.system(size: 22, weight: .light))
+            .foregroundColor(.black)
+            .multilineTextAlignment(.center)
     }
-    .padding(60)
+    .padding(50)
     .background(Color.white)
 
     let renderer = ImageRenderer(content: content)
@@ -465,7 +501,6 @@ func densePayload(_ input: String, level: Int) -> String {
     let hasScheme = lower.hasPrefix("http://") || lower.hasPrefix("https://")
     let looksLikeDomain = !hasScheme && !link.contains(" ") && !link.contains(":") && link.contains(".")
 
-    // Если данных уже достаточно, ничего не добавляем
     func filler(_ count: Int) -> String {
         var seed = UInt64(5381)
         for b in link.utf8 { seed = seed &* 33 &+ UInt64(b) }
@@ -478,15 +513,13 @@ func densePayload(_ input: String, level: Int) -> String {
         return tail
     }
 
-    // Сайт (с https:// или просто домен вроде site.com)
     if hasScheme || looksLikeDomain {
         let url = hasScheme ? link : "https://" + link
-        if url.contains("#") { return url }   // свой # не трогаем, чтобы не сломать ссылку
+        if url.contains("#") { return url }
         let need = target - url.utf8.count - 1
         return need > 0 ? url + "#" + filler(need) : url
     }
 
-    // Обычный текст (не ссылка и не служебный формат вроде WIFI: или mailto:)
     if !link.contains(":") {
         let need = target - link.utf8.count
         return need > 0 ? link + String(repeating: " ", count: need) : link
