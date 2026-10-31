@@ -238,7 +238,9 @@ struct ContentView: View {
     // MARK: - Карточка с QR
 
     private func card(size: CGSize) -> some View {
-        let image = makeQR(from: densePayload(link, level: density))
+        // Добавляем текущие миллисекунды к ссылке, чтобы хэш QR-кода всегда отличался
+        let uniquePayload = link.contains("?") ? "\(link)&rnd=\(Int(Date().timeIntervalSince1970 * 1000))" : "\(link)?rnd=\(Int(Date().timeIntervalSince1970 * 1000))"
+        let image = makeQR(from: densePayload(uniquePayload, level: density))
         let full = size.height
         let collapsed = full * collapsedRatio
         let base = expanded ? full : collapsed
@@ -329,7 +331,7 @@ struct ContentView: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 166) {
+            HStack(spacing: 140) {
                 Button {
                     printQR(image: image, title: title, caption: caption, dateString: currentDateString)
                 } label: {
@@ -391,13 +393,17 @@ struct ContentView: View {
                 }
             }
     }
-
-    private func openCard() {
-        hideKeyboard()
-        expanded = false
-        drag = 0
-        withAnimation(.easeOut(duration: 0.3)) { showCard = true }
+private func openCard() {
+    hideKeyboard()
+    expanded = false
+    drag = 0
+    
+    // Если плотность обычная (0), но мы хотим рандомизировать даже её, 
+    // либо если плотность уже высокая — добавляем уникальный случайный хвост через пробел или #
+    withAnimation(.easeOut(duration: 0.3)) { 
+        showCard = true 
     }
+}
 
     private func toggleExpanded() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
