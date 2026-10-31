@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
 
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
+    // Высота окна увеличена (0.82)
     private let collapsedRatio: CGFloat = 0.82
 
     private var items: [SavedItem] {
@@ -114,6 +115,14 @@ struct ContentView: View {
                     Text("Максимум").tag(2)
                 }
                 .pickerStyle(.segmented)
+
+                if density > 0 && !link.isEmpty {
+                    Text("В коде: \(densePayload(link, level: density))")
+                        .font(.caption2)
+                        .foregroundColor(Color(white: 0.55))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
 
             HStack(spacing: 12) {
@@ -230,6 +239,7 @@ struct ContentView: View {
         // 0 — обычный размер, 1 — на весь экран
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
+        // Увеличенный QR-код
         let qrSide = lerp(230, min(size.width - 56, 390), t)
 
         return VStack(spacing: 0) {
@@ -273,7 +283,7 @@ struct ContentView: View {
                 .padding(8)
                 .background(Color.white)
 
-            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ
+            // СЕРЫЙ ТЕКСТ ПОД QR-КОДОМ (изменяйте этот текст при необходимости)
             Text("Здесь будет ваше описание QR-кода")
                 .font(.system(size: lerp(11, 13, t), weight: .regular))
                 .foregroundColor(Color(white: 0.55))
@@ -414,9 +424,9 @@ func printQR(image: UIImage, title: String, caption: String) {
             .scaledToFit()
             .frame(width: 700, height: 700)
         
-        // Серый текст для печати
+        // Серый текст под QR для печати
         Text("Покажите QR-код контроллеру")
-            .font(.system(size: 32, weight: .regular))
+            .font(.system(size: 34, weight: .regular))
             .foregroundColor(Color(white: 0.55))
             .multilineTextAlignment(.center)
 
@@ -444,25 +454,43 @@ func printQR(image: UIImage, title: String, caption: String) {
     controller.present(animated: true)
 }
 
-/// Делает QR плотнее: к http(s)-ссылке добавляется «хвост» после #,
-/// который сайт игнорирует. Чем длиннее данные, тем больше клеток в коде.
-func densePayload(_ link: String, level: Int) -> String {
-    let lower = link.lowercased()
-    guard level > 0,
-          lower.hasPrefix("http://") || lower.hasPrefix("https://"),
-          !link.contains("#") else { return link }
+/// Делает QR плотнее: добавляет к данным «хвост», чтобы клеток стало больше.
+/// Для сайтов хвост идёт после #, его сайт игнорирует.
+func densePayload(_ input: String, level: Int) -> String {
+    let link = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard level > 0, !link.isEmpty else { return link }
 
     let target = level == 1 ? 55 : 95
-    let need = target - link.utf8.count - 1
-    guard need > 0 else { return link }
+    let lower = link.lowercased()
+    let hasScheme = lower.hasPrefix("http://") || lower.hasPrefix("https://")
+    let looksLikeDomain = !hasScheme && !link.contains(" ") && !link.contains(":") && link.contains(".")
 
-    var seed = UInt64(5381)
-    for b in link.utf8 { seed = seed &* 33 &+ UInt64(b) }
-    let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
-    var tail = ""
-    for _ in 0..<need {
-        seed = seed &* 6364136223846793005 &+ 1442695040888963407
-        tail.append(alphabet[Int((seed >> 33) % UInt64(alphabet.count))])
+    // Если данных уже достаточно, ничего не добавляем
+    func filler(_ count: Int) -> String {
+        var seed = UInt64(5381)
+        for b in link.utf8 { seed = seed &* 33 &+ UInt64(b) }
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+        var tail = ""
+        for _ in 0..<count {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            tail.append(alphabet[Int((seed >> 33) % UInt64(alphabet.count))])
+        }
+        return tail
     }
-    return link + "#" + tail
+
+    // Сайт (с https:// или просто домен вроде site.com)
+    if hasScheme || looksLikeDomain {
+        let url = hasScheme ? link : "https://" + link
+        if url.contains("#") { return url }   // свой # не трогаем, чтобы не сломать ссылку
+        let need = target - url.utf8.count - 1
+        return need > 0 ? url + "#" + filler(need) : url
+    }
+
+    // Обычный текст (не ссылка и не служебный формат вроде WIFI: или mailto:)
+    if !link.contains(":") {
+        let need = target - link.utf8.count
+        return need > 0 ? link + String(repeating: " ", count: need) : link
+    }
+
+    return link
 }
