@@ -297,7 +297,7 @@ struct ContentView: View {
                 .foregroundColor(Color(white: 0.45))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .padding(.top, 24)
+                .padding(.top, 32)
                 .padding(.horizontal, 16)
 
             // 2. Основной текст (caption) с отступом
@@ -308,7 +308,7 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
-                    .padding(.top, 16)
+                    .padding(.top, 24)
                     .padding(.horizontal, 16)
             }
 
@@ -329,7 +329,7 @@ struct ContentView: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 44) {
+            HStack(spacing: 166) {
                 Button {
                     printQR(image: image, title: title, caption: caption, dateString: currentDateString)
                 } label: {
