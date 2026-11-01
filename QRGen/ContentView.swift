@@ -117,7 +117,7 @@ struct ContentView: View {
         }
         .alert("Найден сохранённый QR-код", isPresented: $showMatchAlert, presenting: pendingItem) { item in
             Button("Использовать") {
-                touchItem(item)
+                touchItem(item) // Перемещает наверх, заполняет данные и открывает карточку с нужной подписью
             }
             Button("Отмена", role: .cancel) {
                 pendingItem = nil
@@ -156,10 +156,13 @@ struct ContentView: View {
 
     private func handleScannedLink(_ scannedLink: String) {
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
+            // Если такой код уже есть в истории, сохраняем во временное состояние для Alert
             pendingItem = existingItem
             showMatchAlert = true
         } else {
+            // Если код абсолютно новый, подставляем его
             link = scannedLink
+            // Если перед сканированием пользователь уже ввел кастомную подпись — сразу сохраняем
             if !caption.isEmpty || !title.isEmpty {
                 saveCurrent()
             }
