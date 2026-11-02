@@ -3,6 +3,22 @@ import CoreImage.CIFilterBuiltins
 import AVFoundation
 import VisionKit
 
+// MARK: - Расширение для работы с HEX-цветами в SwiftUI
+extension Color {
+    init(hex: String) {
+        let scanner = Scanner(string: hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted))
+        var hexNumber: UInt64 = 0
+        scanner.scanHexInt64(&hexNumber)
+        
+        let r = Double((hexNumber & 0xFF0000) >> 16) / 255.0
+        let g = Double((hexNumber & 0x00FF00) >> 8) / 255.0
+        let b = Double(hexNumber & 0x0000FF) / 255.0
+        
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
+    }
+}
+
+// MARK: - Модель данных
 struct SavedItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var link: String
@@ -26,6 +42,7 @@ struct SavedItem: Codable, Identifiable, Equatable {
     }
 }
 
+// MARK: - Главное представление
 struct ContentView: View {
     @AppStorage("savedLink") private var link = ""
     @AppStorage("savedCaption") private var caption = ""
@@ -117,7 +134,7 @@ struct ContentView: View {
         }
         .alert("Найден сохранённый QR-код", isPresented: $showMatchAlert, presenting: pendingItem) { item in
             Button("Использовать") {
-                touchItem(item) // Перемещает наверх, заполняет данные и открывает карточку с нужной подписью
+                touchItem(item)
             }
             Button("Отмена", role: .cancel) {
                 pendingItem = nil
@@ -126,7 +143,6 @@ struct ContentView: View {
             let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : "Без подписи")
             Text("Применить сохранённую подпись:\n«\(textToShow)»?")
         }
-        // Умное переключение яркости по состоянию карточки
         .onChange(of: showCard) { isOpen in
             if isOpen {
                 originalBrightness = UIScreen.main.brightness
@@ -156,13 +172,10 @@ struct ContentView: View {
 
     private func handleScannedLink(_ scannedLink: String) {
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
-            // Если такой код уже есть в истории, сохраняем во временное состояние для Alert
             pendingItem = existingItem
             showMatchAlert = true
         } else {
-            // Если код абсолютно новый, подставляем его
             link = scannedLink
-            // Если перед сканированием пользователь уже ввел кастомную подпись — сразу сохраняем
             if !caption.isEmpty || !title.isEmpty {
                 saveCurrent()
             }
@@ -590,7 +603,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(.white, .green)
+                .foregroundStyle(.white, Color(hex: "169402"))
             Text("Успешно")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.black)
