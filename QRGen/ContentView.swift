@@ -582,7 +582,7 @@ func makeQR(from string: String) -> UIImage {
     let context = CIContext()
     let filter = CIFilter.qrCodeGenerator()
     filter.message = Data(string.utf8)
-    filter.correctionLevel = "H"
+    filter.correctionLevel = "M"
     guard let output = filter.outputImage else { return UIImage() }
     let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
     guard let cg = context.createCGImage(scaled, from: scaled.extent) else { return UIImage() }
@@ -657,9 +657,18 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
 
 func densePayload(_ input: String, level: Int) -> String {
     let link = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    
+    // Если пользователь выбрал уровень 0 (Обычная), возвращаем чистую ссылку без изменений
     guard level > 0, !link.isEmpty else { return link }
 
-    let target = level == 1 ? 55 : 95
+    // Жестко задаем целевую длину в зависимости от выбранного ползунка (1 — Плотная, 2 — Максимум)
+    let target = level == 1 ? 60 : 120
+    
+    // Если длина ссылки уже больше или равна целевой, ничего не дописываем, чтобы не сломать QR
+    if link.utf8.count >= target {
+        return link
+    }
+
     let lower = link.lowercased()
     let hasScheme = lower.hasPrefix("http://") || lower.hasPrefix("https://")
     let looksLikeDomain = !hasScheme && !link.contains(" ") && !link.contains(":") && link.contains(".")
