@@ -145,12 +145,12 @@ struct ContentView: View {
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $showScanner) {
-            QRScannerView { scannedString, scannedText in
+            QRScannerView { scannedString in
                 showScanner = false
-                handleScannedResult(link: scannedString, text: scannedText)
+                handleScannedLink(scannedString)
             }
         }
-        // Шторка подтверждения отсканированного QR-кода с возможностью редактирования
+        // Шторка подтверждения отсканированного QR-кода с возможностью редактирования подписи
         .sheet(isPresented: $showConfirmSheet) {
             NavigationView {
                 VStack(spacing: 16) {
@@ -173,7 +173,7 @@ struct ContentView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Подпись под QR (распознано рядом или из истории):")
+                        Text("Подпись под QR (можно изменить):")
                             .font(.footnote)
                             .foregroundColor(Color(white: 0.5))
                         TextField("Подпись под QR-кодом", text: $confirmedCaption)
@@ -296,27 +296,22 @@ struct ContentView: View {
         openCard()
     }
 
-    // MARK: - Обработка сканирования ( QR + Текст рядом )
+    // MARK: - Обработка сканирования с обязательным подтверждением
 
-    private func handleScannedResult(link scannedLink: String, text scannedText: String?) {
+    private func handleScannedLink(_ scannedLink: String) {
         scannedLinkToConfirm = scannedLink
         
-        // 1. Сначала проверяем, есть ли этот QR в нашей истории сохраненных
+        // Если этот QR-код уже есть в сохраненных, берем его подпись
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
             confirmedCaption = existingItem.caption
             confirmedTitle = existingItem.title
-        } 
-        // 2. Если в истории нет, но камера распознала текст рядом с QR
-        else if let nearbyText = scannedText, !nearbyText.isEmpty {
-            confirmedCaption = nearbyText
-            confirmedTitle = title
-        } 
-        // 3. Иначе ставим дефолтное или текущее значение из полей ввода
-        else {
+        } else {
+            // Иначе подставляем то, что было введено в поле на главном экране
             confirmedCaption = caption.isEmpty ? "721BG04" : caption
             confirmedTitle = title
         }
         
+        // Всегда показываем шторку подтверждения перед выводом
         showConfirmSheet = true
     }
 
@@ -658,21 +653,16 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Умный сканер QR + Текст (VisionKit DataScanner)
+// MARK: - Сканер QR (VisionKit DataScanner)
 
 struct QRScannerView: UIViewControllerRepresentable {
-    // Возвращает саму ссылку и распознанный рядом текст
-    var onScan: (String, String?) -> Void
+    var onScan: (String) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
-        // Включаем распознавание и штрихкодов, и обычного печатного текста (OCR)
         let scanner = DataScannerViewController(
-            recognizedDataTypes: [
-                .barcode(symbologies: [.qr]),
-                .text(languages: ["ru", "en"])
-            ],
+            recognizedDataTypes: [.barcode(symbologies: [.qr])],
             qualityLevel: .balanced,
-            recognizesMultipleItems: true,
+            recognizesMultipleItems: false,
             isGuidanceEnabled: true,
             isHighlightingEnabled: true
         )
@@ -688,60 +678,23 @@ struct QRScannerView: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        var onScan: (String, String?) -> Void
+        var onScan: (String) -> Void
         var hasScanned = false
 
-        init(onScan: @escaping (String, String?) -> Void) {
+        init(onScan: @escaping (String) -> Void) {
             self.onScan = onScan
         }
 
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
-            
-            // Ищем отсканированный QR-код
-            var foundQrPayload: String? = nil
-            var qrFrame: CGRect = .zero
-            
-            for item in allItems {
+            for item in addedItems {
                 if case let .barcode(code) = item, let payload = code.payloadStringValue {
-                    foundQrPayload = payload
-                    qrFrame = code.bounds
+                    hasScanned = true
+                    DispatchQueue.main.async {
+                        self.onScan(payload)
+                    }
                     break
                 }
-            }
-            
-            guard let payload = foundQrPayload else { return }
-            
-            // Ищем текст, который находится ближе всего к QR-коду (рядом, сверху или снизу)
-            var closestText: String? = nil
-            var minDistance: CGFloat = CGFloat.greatestFiniteMagnitude
-            
-            for item in allItems {
-                if case let .text(textObj) = item {
-                    let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Пропускаем слишком длинные тексты или пустые строчки
-                    guard !textString.isEmpty, textString.count < 30 else { continue }
-                    
-                    let textFrame = textObj.bounds
-                    // Вычисляем расстояние между центром QR-кода и центром текстового блока
-                    let qrCenter = CGPoint(x: qrFrame.midX, y: qrFrame.midY)
-                    let textCenter = CGPoint(x: textFrame.midX, y: textFrame.midY)
-                    let distance = hypot(qrCenter.x - textCenter.x, qrCenter.y - textCenter.y)
-                    
-                    // Если этот текст ближе остальных и расположен рядом (например, по вертикали)
-                    if distance < minDistance {
-                        minDistance = distance
-                        closestText = textString
-                    }
-                }
-            }
-            
-            // Защита: если расстояние слишком большое, значит текста рядом нет
-            let finalCaption = minDistance < 350 ? closestText : nil
-            
-            hasScanned = true
-            DispatchQueue.main.async {
-                self.onScan(payload, finalCaption)
             }
         }
     }
