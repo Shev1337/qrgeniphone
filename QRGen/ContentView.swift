@@ -60,6 +60,14 @@ struct ContentView: View {
     @State private var showMatchAlert = false
     @State private var pendingItem: SavedItem? = nil
 
+    // Состояния для меню действий и редактирования
+    @State private var selectedItemForAction: SavedItem? = nil
+    @State private var showActionSheet = false
+    @State private var showEditModal = false
+    @State private var editingItem: SavedItem? = nil
+    @State private var editCaption = ""
+    @State private var editTitle = ""
+
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
 
@@ -71,6 +79,14 @@ struct ContentView: View {
         if let data = try? JSONEncoder().encode(new),
            let str = String(data: data, encoding: .utf8) {
             savedData = str
+        }
+    }
+
+    private func updateItem(_ updatedItem: SavedItem) {
+        var list = items
+        if let index = list.firstIndex(where: { $0.id == updatedItem.id }) {
+            list[index] = updatedItem
+            setItems(list)
         }
     }
 
@@ -142,6 +158,59 @@ struct ContentView: View {
         } message: { item in
             let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : "Без подписи")
             Text("Применить сохранённую подпись:\n«\(textToShow)»?")
+        }
+        .confirmationDialog("Выберите действие", isPresented: $showActionSheet, presenting: selectedItemForAction) { item in
+            Button("Вывести") {
+                touchItem(item)
+            }
+            Button("Изменить") {
+                editingItem = item
+                editCaption = item.caption
+                editTitle = item.title
+                showEditModal = true
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: { item in
+            let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : item.link)
+            Text("Элемент: «\(textToShow)»")
+        }
+        .sheet(isPresented: $showEditModal) {
+            NavigationView {
+                VStack(spacing: 16) {
+                    TextField("Подпись под QR-кодом", text: $editCaption)
+                        .textInputAutocapitalization(.characters)
+                        .padding()
+                        .background(Color(white: 0.95))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    TextField("Текст сверху (необязательно)", text: $editTitle)
+                        .padding()
+                        .background(Color(white: 0.95))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    Spacer()
+                }
+                .padding(20)
+                .navigationTitle("Редактировать")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Отмена") {
+                            showEditModal = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Сохранить") {
+                            if var item = editingItem {
+                                item.caption = editCaption
+                                item.title = editTitle
+                                updateItem(item)
+                            }
+                            showEditModal = false
+                        }
+                    }
+                }
+            }
         }
         .onChange(of: showCard) { isOpen in
             if isOpen {
@@ -300,7 +369,8 @@ struct ContentView: View {
 
         return HStack(spacing: 12) {
             Button {
-                touchItem(item)
+                selectedItemForAction = item
+                showActionSheet = true
             } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(primary)
@@ -658,13 +728,10 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
 func densePayload(_ input: String, level: Int) -> String {
     let link = input.trimmingCharacters(in: .whitespacesAndNewlines)
     
-    // Если пользователь выбрал уровень 0 (Обычная), возвращаем чистую ссылку без изменений
     guard level > 0, !link.isEmpty else { return link }
 
-    // Жестко задаем целевую длину в зависимости от выбранного ползунка (1 — Плотная, 2 — Максимум)
     let target = level == 1 ? 60 : 120
     
-    // Если длина ссылки уже больше или равна целевой, ничего не дописываем, чтобы не сломать QR
     if link.utf8.count >= target {
         return link
     }
