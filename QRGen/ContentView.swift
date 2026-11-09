@@ -56,11 +56,12 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
     @State private var originalBrightness: CGFloat = 1.0
 
-    // Состояния для подтверждения отсканированного QR перед выводом
+    // Состояния для подтверждения отсканированного QR и выбора текста
     @State private var showConfirmSheet = false
     @State private var scannedLinkToConfirm = ""
     @State private var confirmedCaption = ""
     @State private var confirmedTitle = ""
+    @State private var detectedTexts: [String] = []
 
     // Состояния для меню действий и редактирования сохранённых
     @State private var selectedItemForAction: SavedItem? = nil
@@ -145,12 +146,12 @@ struct ContentView: View {
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $showScanner) {
-            QRScannerView { scannedString, scannedText in
+            QRScannerView { scannedString, texts in
                 showScanner = false
-                handleScannedResult(link: scannedString, text: scannedText)
+                handleScannedResult(link: scannedString, texts: texts)
             }
         }
-        // Шторка подтверждения отсканированного QR-кода с возможностью редактирования подписи
+        // Шторка подтверждения с возможностью выбора распознанного текста
         .sheet(isPresented: $showConfirmSheet) {
             NavigationView {
                 VStack(spacing: 16) {
@@ -172,8 +173,35 @@ struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
+                    // Если камера поймала несколько текстов — показываем их для выбора
+                    if !detectedTexts.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Выберите надпись с экрана:")
+                                .font(.footnote)
+                                .foregroundColor(Color(white: 0.5))
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(detectedTexts, id: \.self) { candidate in
+                                        Button {
+                                            confirmedCaption = candidate.uppercased()
+                                        } label: {
+                                            Text(candidate)
+                                                .font(.system(size: 14, weight: .medium))
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .background(confirmedCaption == candidate.uppercased() ? Color.black : Color(white: 0.92))
+                                                .foregroundColor(confirmedCaption == candidate.uppercased() ? .white : .black)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Подпись под QR (распознано камерой):")
+                        Text("Итоговая подпись под QR:")
                             .font(.footnote)
                             .foregroundColor(Color(white: 0.5))
                         TextField("Подпись под QR-кодом", text: $confirmedCaption)
@@ -296,22 +324,23 @@ struct ContentView: View {
         openCard()
     }
 
-    // MARK: - Обработка сканирования (QR + OCR текст рядом)
+    // MARK: - Обработка сканирования с выбором текстов
 
-    private func handleScannedResult(link scannedLink: String, text scannedText: String?) {
+    private func handleScannedResult(link scannedLink: String, texts: [String]) {
         scannedLinkToConfirm = scannedLink
+        detectedTexts = texts
         
-        // 1. Проверяем историю: если такой QR уже был сохранен, берем его подпись
+        // 1. Проверяем историю
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
             confirmedCaption = existingItem.caption
             confirmedTitle = existingItem.title
         } 
-        // 2. Если в истории нет, но камера распознала текст рядом с QR — подставляем его!
-        else if let nearbyText = scannedText, !nearbyText.isEmpty {
-            confirmedCaption = nearbyText.uppercased()
+        // 2. Если есть распознанные тексты с камеры, берем первый (самый близкий) по умолчанию
+        else if let firstText = texts.first {
+            confirmedCaption = firstText.uppercased()
             confirmedTitle = title
         } 
-        // 3. Если текст не обнаружился, берем то, что введено в поле ввода
+        // 3. Иначе берем то, что введено в поле
         else {
             confirmedCaption = caption
             confirmedTitle = title
@@ -658,10 +687,10 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Умный сканер QR + Текст (VisionKit DataScanner)
+// MARK: - Умный сканер QR + скан текста с небольшой задержкой
 
 struct QRScannerView: UIViewControllerRepresentable {
-    var onScan: (String, String?) -> Void
+    var onScan: (String, [String]) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
@@ -686,55 +715,67 @@ struct QRScannerView: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        var onScan: (String, String?) -> Void
+        var onScan: (String, [String]) -> Void
         var hasScanned = false
 
-        init(onScan: @escaping (String, String?) -> Void) {
+        init(onScan: @escaping (String, [String]) -> Void) {
             self.onScan = onScan
         }
 
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
             
-            var foundQrPayload: String? = nil
-            var qrCenterY: CGFloat = 0
-            
-            for item in allItems {
-                if case let .barcode(code) = item, let payload = code.payloadStringValue {
-                    foundQrPayload = payload
-                    // Безопасно получаем центр рамки QR-кода
-                    qrCenterY = (code.bounds.bottomRight.y + code.bounds.topLeft.y) / 2
-                    break
-                }
-            }
-            
-            guard let payload = foundQrPayload else { return }
-            
-            // Ищем текст, который расположен ближе всего по вертикали к QR-коду
-            var closestText: String? = nil
-            var minVerticalDistance: CGFloat = CGFloat.greatestFiniteMagnitude
-            
-            for item in allItems {
-                if case let .text(textObj) = item {
-                    let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !textString.isEmpty, textString.count < 35 else { continue }
-                    
-                    let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
-                    let verticalDistance = abs(qrCenterY - textCenterY)
-                    
-                    if verticalDistance < minVerticalDistance {
-                        minVerticalDistance = verticalDistance
-                        closestText = textString
+            // Даем камере 0.4 секунды набрать больше контекста (текста) вокруг,
+            // чтобы успел отсканироваться не только QR, но и надпись рядом.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard !self.hasScanned else { return }
+                
+                var foundQrPayload: String? = nil
+                var qrCenterY: CGFloat = 0
+                
+                for item in allItems {
+                    if case let .barcode(code) = item, let payload = code.payloadStringValue {
+                        foundQrPayload = payload
+                        qrCenterY = (code.bounds.bottomRight.y + code.bounds.topLeft.y) / 2
+                        break
                     }
                 }
-            }
-            
-            // Если текст найден достаточно близко (над или под QR)
-            let finalCaption = minVerticalDistance < 250 ? closestText : nil
-            
-            hasScanned = true
-            DispatchQueue.main.async {
-                self.onScan(payload, finalCaption)
+                
+                guard let payload = foundQrPayload else { return }
+                
+                // Собираем все текстовые блоки вокруг, сортируя по близости к QR-коду
+                var textCandidates: [(text: String, distance: CGFloat)] = []
+                
+                for item in allItems {
+                    if case let .text(textObj) = item {
+                        let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !textString.isEmpty, textString.count < 35 else { continue }
+                        
+                        let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
+                        let distance = abs(qrCenterY - textCenterY)
+                        
+                        // Сохраняем те, что находятся на разумном расстоянии от QR
+                        if distance < 300 {
+                            textCandidates.append((text: textString, distance: distance))
+                        }
+                    }
+                }
+                
+                // Сортируем от самых близких к QR к более дальним
+                textCandidates.sort { $0.distance < $1.distance }
+                
+                // Убираем дубликаты
+                var uniqueTexts: [String] = []
+                for candidate in textCandidates {
+                    if !uniqueTexts.contains(candidate.text) {
+                        uniqueTexts.append(candidate.text)
+                    }
+                }
+                
+                self.hasScanned = true
+                DispatchQueue.main.async {
+                    self.onScan(payload, uniqueTexts)
+                }
             }
         }
     }
@@ -800,7 +841,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
 
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text(dateString)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
