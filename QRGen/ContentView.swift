@@ -687,17 +687,16 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Умный сканер QR + глубокое качественное распознавание текста (с увеличенной задержкой)
+// MARK: - Надежный сканер QR + текста без сбоев компиляции
 
 struct QRScannerView: UIViewControllerRepresentable {
     var onScan: (String, [String]) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
+        // Стандартный инициализатор без передачи языкового массива напрямую, 
+        // что полностью исключает баг модуля компилятора Swift на arm64.
         let scanner = DataScannerViewController(
-            recognizedDataTypes: [
-                .barcode(symbologies: [.qr]),
-                .text(languages: ["ru", "en"])
-            ],
+            recognizedDataTypes: [.barcode(symbologies: [.qr]), .text()],
             qualityLevel: .accurate,
             recognizesMultipleItems: true,
             isGuidanceEnabled: true,
@@ -725,9 +724,8 @@ struct QRScannerView: UIViewControllerRepresentable {
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
             
-            // Увеличиваем задержку до 1.3 секунды, чтобы камера полностью стабилизировалась
-            // и VisionKit успел максимально детально распознать текст рядом с QR.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            // Увеличиваем задержку до 1.4 секунды для идеальной стабилизации и распознавания текста
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                 guard !self.hasScanned else { return }
                 
                 var foundQrPayload: String? = nil
@@ -748,7 +746,6 @@ struct QRScannerView: UIViewControllerRepresentable {
                 for item in allItems {
                     if case let .text(textObj) = item {
                         let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                        // Отсекаем слишком длинные предложения, оставляя только короткие надписи
                         guard !textString.isEmpty, textString.count < 30 else { continue }
                         
                         let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
@@ -760,7 +757,6 @@ struct QRScannerView: UIViewControllerRepresentable {
                     }
                 }
                 
-                // Сортируем по близости к QR-коду
                 textCandidates.sort { $0.distance < $1.distance }
                 
                 var uniqueTexts: [String] = []
