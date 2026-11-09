@@ -56,11 +56,13 @@ struct ContentView: View {
     @State private var drag: CGFloat = 0
     @State private var originalBrightness: CGFloat = 1.0
 
-    // Состояния для подтверждения найденного QR
-    @State private var showMatchAlert = false
-    @State private var pendingItem: SavedItem? = nil
+    // Состояния для подтверждения отсканированного QR перед выводом
+    @State private var showConfirmSheet = false
+    @State private var scannedLinkToConfirm = ""
+    @State private var confirmedCaption = ""
+    @State private var confirmedTitle = ""
 
-    // Состояния для меню действий и редактирования
+    // Состояния для меню действий и редактирования сохранённых
     @State private var selectedItemForAction: SavedItem? = nil
     @State private var showActionSheet = false
     @State private var showEditModal = false
@@ -148,16 +150,73 @@ struct ContentView: View {
                 handleScannedLink(scannedString)
             }
         }
-        .alert("Найден сохранённый QR-код", isPresented: $showMatchAlert, presenting: pendingItem) { item in
-            Button("Использовать") {
-                touchItem(item)
+        // Шторка подтверждения отсканированного QR-кода с возможностью редактирования
+        .sheet(isPresented: $showConfirmSheet) {
+            NavigationView {
+                VStack(spacing: 16) {
+                    Text("Отсканирован QR-код")
+                        .font(.headline)
+                        .padding(.top, 8)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Данные QR-кода:")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        Text(scannedLinkToConfirm)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.black)
+                            .lineLimit(2)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(white: 0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Подпись под QR (можно исправить):")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        TextField("Подпись под QR-кодом", text: $confirmedCaption)
+                            .textInputAutocapitalization(.characters)
+                            .padding()
+                            .background(Color(white: 0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Текст сверху (необязательно):")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        TextField("Текст сверху", text: $confirmedTitle)
+                            .padding()
+                            .background(Color(white: 0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    Spacer()
+                }
+                .padding(20)
+                .navigationTitle("Подтверждение вывода")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Отмена") {
+                            showConfirmSheet = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Вывести") {
+                            link = scannedLinkToConfirm
+                            caption = confirmedCaption
+                            title = confirmedTitle
+                            saveCurrent()
+                            showConfirmSheet = false
+                            openCard()
+                        }
+                        .bold()
+                    }
+                }
             }
-            Button("Отмена", role: .cancel) {
-                pendingItem = nil
-            }
-        } message: { item in
-            let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : "Без подписи")
-            Text("Применить сохранённую подпись:\n«\(textToShow)»?")
         }
         .confirmationDialog("Выберите действие", isPresented: $showActionSheet, presenting: selectedItemForAction) { item in
             Button("Вывести") {
@@ -237,19 +296,18 @@ struct ContentView: View {
         openCard()
     }
 
-    // MARK: - Проверка сканирования
+    // MARK: - Обработка сканирования с подтверждением
 
     private func handleScannedLink(_ scannedLink: String) {
+        scannedLinkToConfirm = scannedLink
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
-            pendingItem = existingItem
-            showMatchAlert = true
+            confirmedCaption = existingItem.caption
+            confirmedTitle = existingItem.title
         } else {
-            link = scannedLink
-            if !caption.isEmpty || !title.isEmpty {
-                saveCurrent()
-            }
-            openCard()
+            confirmedCaption = caption.isEmpty ? "721BG04" : caption
+            confirmedTitle = title
         }
+        showConfirmSheet = true
     }
 
     // MARK: - Главный экран
