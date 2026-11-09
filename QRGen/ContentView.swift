@@ -12,7 +12,7 @@ extension Color {
         
         let r = Double((hexNumber & 0xFF0000) >> 16) / 255.0
         let g = Double((hexNumber & 0x00FF00) >> 8) / 255.0
-        let b = Double(hexNumber & 0x0000FF) / 255.
+        let b = Double(hexNumber & 0x0000FF) / 255.0
         
         self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
     }
@@ -698,7 +698,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                 .barcode(symbologies: [.qr]),
                 .text(languages: ["ru", "en"])
             ],
-            qualityLevel: .accurate, // Максимальная точность распознавания текста (OCR)
+            qualityLevel: .accurate,
             recognizesMultipleItems: true,
             isGuidanceEnabled: true,
             isHighlightingEnabled: true
@@ -725,8 +725,6 @@ struct QRScannerView: UIViewControllerRepresentable {
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
             
-            // Увеличиваем задержку до 0.8 секунды, чтобы камера успела сфокусироваться
-            // и VisionKit детально проанализировал и качественно распознал все буквы и цифры.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 guard !self.hasScanned else { return }
                 
@@ -748,20 +746,17 @@ struct QRScannerView: UIViewControllerRepresentable {
                 for item in allItems {
                     if case let .text(textObj) = item {
                         let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                        // Фильтруем слишком длинные предложения или пустые строки, оставляя только емкие надписи
                         guard !textString.isEmpty, textString.count < 30 else { continue }
                         
                         let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
                         let distance = abs(qrCenterY - textCenterY)
                         
-                        // Сохраняем надписи около QR
                         if distance < 350 {
                             textCandidates.append((text: textString, distance: distance))
                         }
                     }
                 }
                 
-                // Сортируем по близости к QR-коду
                 textCandidates.sort { $0.distance < $1.distance }
                 
                 var uniqueTexts: [String] = []
