@@ -125,7 +125,7 @@ struct ContentView: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
-                                    .foregroundStyle(.white, Color(hex: "169402"))
+                                    .foregroundStyle(Color.white, Color(hex: "169402")) //
                                 Text("Ваш платеж принят")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.black)
