@@ -12,7 +12,7 @@ extension Color {
         
         let r = Double((hexNumber & 0xFF0000) >> 16) / 255.0
         let g = Double((hexNumber & 0x00FF00) >> 8) / 255.0
-        let b = Double(hexNumber & 0x0000FF) / 255.0
+        let b = Double((hexNumber & 0x0000FF) / 255.0)
         
         self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
     }
@@ -687,7 +687,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Умный сканер QR + глубокое качественное распознавание текста
+// MARK: - Умный сканер QR + глубокое качественное распознавание текста (с увеличенной задержкой)
 
 struct QRScannerView: UIViewControllerRepresentable {
     var onScan: (String, [String]) -> Void
@@ -725,7 +725,9 @@ struct QRScannerView: UIViewControllerRepresentable {
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            // Увеличиваем задержку до 1.3 секунды, чтобы камера полностью стабилизировалась
+            // и VisionKit успел максимально детально распознать текст рядом с QR.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
                 guard !self.hasScanned else { return }
                 
                 var foundQrPayload: String? = nil
@@ -746,6 +748,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                 for item in allItems {
                     if case let .text(textObj) = item {
                         let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                        // Отсекаем слишком длинные предложения, оставляя только короткие надписи
                         guard !textString.isEmpty, textString.count < 30 else { continue }
                         
                         let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
@@ -757,6 +760,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                     }
                 }
                 
+                // Сортируем по близости к QR-коду
                 textCandidates.sort { $0.distance < $1.distance }
                 
                 var uniqueTexts: [String] = []
