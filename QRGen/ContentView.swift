@@ -3,18 +3,30 @@ import CoreImage.CIFilterBuiltins
 import AVFoundation
 import VisionKit
 
-// MARK: - Расширение для работы с HEX-цветами в SwiftUI
+// MARK: - Надежное расширение для работы с HEX-цветами в SwiftUI
 extension Color {
     init(hex: String) {
-        let scanner = Scanner(string: hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted))
-        var hexNumber: UInt64 = 0
-        scanner.scanHexInt64(&hexNumber)
-        
-        let r = Double(hexNumber & 0xFF0000 >> 16) / 255.0
-        let g = Double(hexNumber & 0x00FF00 >> 8) / 255.0
-        let b = Double(hexNumber & 0x0000FF) / 255.0 // Сначала Double, потом деление
-        
-        self.init(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
+        let hexClean = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hexClean).scanHexInt64(&int)
+        let r, g, b: UInt64
+        switch hexClean.count {
+        case 3: // RGB (12-bit)
+            (r, g, b) = ((int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (r, g, b) = (int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (r, g, b) = (int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (r, g, b) = (0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255.0,
+            green: Double(g) / 255.0,
+            blue: Double(b) / 255.0,
+            opacity: 1.0
+        )
     }
 }
 
@@ -125,7 +137,7 @@ struct ContentView: View {
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
-                                    .foregroundStyle(Color.white, Color(hex: "169402")) //
+                                    .foregroundStyle(Color.white, Color(hex: "169402"))
                                 Text("Ваш платеж принят")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.black)
@@ -687,14 +699,12 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Надежный сканер QR + текста без сбоев компиляции
+// MARK: - Надежный сканер QR + текста с долгой стабилизацией
 
 struct QRScannerView: UIViewControllerRepresentable {
     var onScan: (String, [String]) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
-        // Стандартный инициализатор без передачи языкового массива напрямую, 
-        // что полностью исключает баг модуля компилятора Swift на arm64.
         let scanner = DataScannerViewController(
             recognizedDataTypes: [.barcode(symbologies: [.qr]), .text()],
             qualityLevel: .accurate,
@@ -724,8 +734,8 @@ struct QRScannerView: UIViewControllerRepresentable {
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
             
-            // Увеличиваем задержку до 1.4 секунды для идеальной стабилизации и распознавания текста
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            // Задержка 1.5 секунды: камера успевает идеально сфокусироваться и распознать текст
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 guard !self.hasScanned else { return }
                 
                 var foundQrPayload: String? = nil
@@ -811,7 +821,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(.white, Color(hex: "169402"))
+                .foregroundStyle(Color.white, Color(hex: "169402"))
             Text("Успешно")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.black)
