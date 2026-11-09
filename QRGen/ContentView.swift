@@ -145,9 +145,9 @@ struct ContentView: View {
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $showScanner) {
-            QRScannerView { scannedString in
+            QRScannerView { scannedString, scannedText in
                 showScanner = false
-                handleScannedLink(scannedString)
+                handleScannedResult(link: scannedString, text: scannedText)
             }
         }
         // Шторка подтверждения отсканированного QR-кода с возможностью редактирования подписи
@@ -296,22 +296,27 @@ struct ContentView: View {
         openCard()
     }
 
-    // MARK: - Обработка сканирования с обязательным подтверждением
+    // MARK: - Обработка сканирования ( QR + Текст рядом )
 
-    private func handleScannedLink(_ scannedLink: String) {
+    private func handleScannedResult(link scannedLink: String, text scannedText: String?) {
         scannedLinkToConfirm = scannedLink
         
-        // Если этот QR-код уже есть в сохраненных, берем его подпись
+        // 1. Сначала проверяем, есть ли этот QR-код в истории сохраненных
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
             confirmedCaption = existingItem.caption
             confirmedTitle = existingItem.title
-        } else {
-            // Иначе подставляем то, что было введено в поле на главном экране
-            confirmedCaption = caption.isEmpty ? "721BG04" : caption
+        } 
+        // 2. Если в истории нет, но камера распознала текст рядом с QR-кодом
+        else if let nearbyText = scannedText, !nearbyText.isEmpty {
+            confirmedCaption = nearbyText.uppercased()
+            confirmedTitle = title
+        } 
+        // 3. Иначе ставим то, что было введено на главном экране (или пустоту)
+        else {
+            confirmedCaption = caption.isEmpty ? "" : caption
             confirmedTitle = title
         }
         
-        // Всегда показываем шторку подтверждения перед выводом
         showConfirmSheet = true
     }
 
@@ -653,16 +658,19 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Сканер QR (VisionKit DataScanner)
+// MARK: - Умный сканер QR + Текст (VisionKit DataScanner)
 
 struct QRScannerView: UIViewControllerRepresentable {
-    var onScan: (String) -> Void
+    var onScan: (String, String?) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
-            recognizedDataTypes: [.barcode(symbologies: [.qr])],
+            recognizedDataTypes: [
+                .barcode(symbologies: [.qr]),
+                .text(languages: ["ru", "en"])
+            ],
             qualityLevel: .balanced,
-            recognizesMultipleItems: false,
+            recognizesMultipleItems: true,
             isGuidanceEnabled: true,
             isHighlightingEnabled: true
         )
@@ -678,23 +686,54 @@ struct QRScannerView: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        var onScan: (String) -> Void
+        var onScan: (String, String?) -> Void
         var hasScanned = false
 
-        init(onScan: @escaping (String) -> Void) {
+        init(onScan: @escaping (String, String?) -> Void) {
             self.onScan = onScan
         }
 
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
             guard !hasScanned else { return }
-            for item in addedItems {
+            
+            var foundQrPayload: String? = nil
+            var qrFrame: CGRect = .zero
+            
+            for item in allItems {
                 if case let .barcode(code) = item, let payload = code.payloadStringValue {
-                    hasScanned = true
-                    DispatchQueue.main.async {
-                        self.onScan(payload)
-                    }
+                    foundQrPayload = payload
+                    qrFrame = code.bounds.cgRect
                     break
                 }
+            }
+            
+            guard let payload = foundQrPayload else { return }
+            
+            var closestText: String? = nil
+            var minDistance: CGFloat = CGFloat.greatestFiniteMagnitude
+            
+            for item in allItems {
+                if case let .text(textObj) = item {
+                    let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !textString.isEmpty, textString.count < 30 else { continue }
+                    
+                    let textFrame = textObj.bounds.cgRect
+                    let qrCenter = CGPoint(x: qrFrame.midX, y: qrFrame.midY)
+                    let textCenter = CGPoint(x: textFrame.midX, y: textFrame.midY)
+                    let distance = hypot(qrCenter.x - textCenter.x, qrCenter.y - textCenter.y)
+                    
+                    if distance < minDistance {
+                        minDistance = distance
+                        closestText = textString
+                    }
+                }
+            }
+            
+            let finalCaption = minDistance < 400 ? closestText : nil
+            
+            hasScanned = true
+            DispatchQueue.main.async {
+                self.onScan(payload, finalCaption)
             }
         }
     }
