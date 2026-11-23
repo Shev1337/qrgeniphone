@@ -78,6 +78,9 @@ struct ContentView: View {
     @State private var confirmedTitle = ""
     @State private var detectedTexts: [String] = []
 
+    // Дата, показываемая на билете (момент генерации этого QR)
+    @State private var currentItemDate: Date = Date()
+
     // История уже сгенерированных QR
     @State private var showHistory = false
 
@@ -115,11 +118,15 @@ struct ContentView: View {
         a + (b - a) * t
     }
 
-    private var formattedCurrentDate: String {
+    private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMMM yyyy HH:mm"
-        return formatter.string(from: Date())
+        return formatter.string(from: date)
+    }
+
+    private var formattedCurrentDate: String {
+        formattedDate(Date())
     }
 
     var body: some View {
@@ -381,6 +388,7 @@ struct ContentView: View {
         link = item.link
         caption = item.caption
         title = item.title
+        currentItemDate = item.date
 
         var list = items
         list.removeAll { $0.link == item.link }
@@ -400,16 +408,19 @@ struct ContentView: View {
         if let existingItem = items.first(where: { $0.link == scannedLink }) {
             confirmedCaption = existingItem.caption
             confirmedTitle = existingItem.title
+            currentItemDate = existingItem.date
         } 
         // 2. Если есть распознанные тексты с камеры, берем первый (самый точный/близкий) по умолчанию
         else if let firstText = texts.first {
             confirmedCaption = firstText.uppercased()
             confirmedTitle = title
+            currentItemDate = Date()
         } 
         // 3. Иначе берем то, что введено в поле
         else {
             confirmedCaption = caption
             confirmedTitle = title
+            currentItemDate = Date()
         }
         
         showConfirmSheet = true
@@ -478,6 +489,8 @@ struct ContentView: View {
 
             HStack(spacing: 12) {
                 Button {
+                    hideKeyboard()
+                    currentItemDate = Date()
                     openCard()
                 } label: {
                     Text("Создать QR-код")
@@ -654,7 +667,7 @@ struct ContentView: View {
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
         let qrSide = lerp(240, min(size.width - 56, 330), t)
-        let currentDateString = formattedCurrentDate
+        let currentDateString = formattedDate(currentItemDate)
 
         return VStack(spacing: 0) {
             Capsule()
