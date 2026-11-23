@@ -36,13 +36,15 @@ struct SavedItem: Codable, Identifiable, Equatable {
     var link: String
     var caption: String
     var title: String = ""
+    var date: Date = Date()
 
-    enum CodingKeys: String, CodingKey { case id, link, caption, title }
+    enum CodingKeys: String, CodingKey { case id, link, caption, title, date }
 
     init(link: String, caption: String, title: String) {
         self.link = link
         self.caption = caption
         self.title = title
+        self.date = Date()
     }
 
     init(from decoder: Decoder) throws {
@@ -51,6 +53,7 @@ struct SavedItem: Codable, Identifiable, Equatable {
         link = (try? c.decode(String.self, forKey: .link)) ?? ""
         caption = (try? c.decode(String.self, forKey: .caption)) ?? ""
         title = (try? c.decode(String.self, forKey: .title)) ?? ""
+        date = (try? c.decode(Date.self, forKey: .date)) ?? Date()
     }
 }
 
@@ -74,6 +77,9 @@ struct ContentView: View {
     @State private var confirmedCaption = ""
     @State private var confirmedTitle = ""
     @State private var detectedTexts: [String] = []
+
+    // История уже сгенерированных QR
+    @State private var showHistory = false
 
     // Состояния для меню действий и редактирования сохранённых
     @State private var selectedItemForAction: SavedItem? = nil
@@ -311,6 +317,54 @@ struct ContentView: View {
                 }
             }
         }
+        // Экран истории уже сгенерированных QR-кодов
+        .sheet(isPresented: $showHistory) {
+            NavigationView {
+                VStack(spacing: 0) {
+                    if items.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 56))
+                                .foregroundColor(Color(white: 0.55))
+                            Text("История пуста")
+                                .font(.headline)
+                                .foregroundColor(.black)
+                            Text("Сгенерированные QR-коды будут появляться здесь")
+                                .font(.footnote)
+                                .foregroundColor(Color(white: 0.55))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 60)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        List {
+                            ForEach(items) { item in
+                                historyRow(item)
+                            }
+                            .onDelete(perform: deleteHistoryItems)
+                        }
+                        .listStyle(.plain)
+                    }
+                }
+                .navigationTitle("История QR-кодов")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") {
+                            showHistory = false
+                        }
+                    }
+                    if !items.isEmpty {
+                        ToolbarItem(placement: .destructiveAction) {
+                            Button("Очистить всё", role: .destructive) {
+                                setItems([])
+                                showHistory = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
         .onChange(of: showCard) { isOpen in
             if isOpen {
                 originalBrightness = UIScreen.main.brightness
@@ -448,6 +502,17 @@ struct ContentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(link.isEmpty)
+
+                Button {
+                    showHistory = true
+                } label: {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 56, height: 52)
+                        .background(Color(white: 0.95))
+                        .foregroundColor(.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
             }
 
             if !items.isEmpty {
@@ -516,6 +581,60 @@ struct ContentView: View {
         var list = items
         list.removeAll { $0.link == new.link }
         list.insert(new, at: 0)
+        setItems(list)
+    }
+
+    // MARK: - История
+
+    private func historyRow(_ item: SavedItem) -> some View {
+        let primary: String = !item.caption.isEmpty ? item.caption.uppercased()
+            : (!item.title.isEmpty ? item.title : item.link)
+        let dateString: String = {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "ru_RU")
+            f.dateFormat = "d MMMM yyyy, HH:mm"
+            return f.string(from: item.date)
+        }()
+
+        return Button {
+            touchItem(item)
+            showHistory = false
+        } label: {
+            HStack(spacing: 12) {
+                Image(uiImage: makeQR(from: item.link))
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 64, height: 64)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(primary)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.black)
+                        .lineLimit(2)
+                    Text(item.link)
+                        .font(.footnote)
+                        .foregroundColor(Color(white: 0.5))
+                        .lineLimit(1)
+                    Text(dateString)
+                        .font(.caption2)
+                        .foregroundColor(Color(white: 0.55))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color(white: 0.95))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+
+    private func deleteHistoryItems(offsets: IndexSet) {
+        var list = items
+        list.remove(atOffsets: offsets)
         setItems(list)
     }
 
