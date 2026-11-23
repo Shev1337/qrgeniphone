@@ -1,6 +1,5 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
-import AVFoundation
 import VisionKit
 
 // MARK: - Надежное расширение для работы с HEX-цветами в SwiftUI
@@ -30,41 +29,15 @@ extension Color {
     }
 }
 
-// MARK: - Модель данных
-struct SavedItem: Codable, Identifiable, Equatable {
-    var id = UUID()
-    var link: String
-    var caption: String
-    var title: String = ""
-    var date: Date = Date()
-
-    enum CodingKeys: String, CodingKey { case id, link, caption, title, date }
-
-    init(link: String, caption: String, title: String) {
-        self.link = link
-        self.caption = caption
-        self.title = title
-        self.date = Date()
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
-        link = (try? c.decode(String.self, forKey: .link)) ?? ""
-        caption = (try? c.decode(String.self, forKey: .caption)) ?? ""
-        title = (try? c.decode(String.self, forKey: .title)) ?? ""
-        date = (try? c.decode(Date.self, forKey: .date)) ?? Date()
-    }
-}
-
 // MARK: - Главное представление
 struct ContentView: View {
-    @AppStorage("savedLink") private var link = ""
-    @AppStorage("savedCaption") private var caption = ""
+    @AppStorage("savedLink") private var link = "https://avtobys.kz"
     @AppStorage("savedTitle") private var title = ""
     @AppStorage("savedItems") private var savedData = ""
     @AppStorage("density") private var density = 0
 
+    @State private var caption = "04"
+    @State private var sourceLink: String?
     @State private var showCard = false
     @State private var showScanner = false
     @State private var expanded = false
@@ -77,9 +50,13 @@ struct ContentView: View {
     @State private var confirmedCaption = ""
     @State private var confirmedTitle = ""
     @State private var detectedTexts: [String] = []
-
-    // Дата, показываемая на билете (момент генерации этого QR)
-    @State private var currentItemDate: Date = Date()
+    @State private var confirmationQR: UIImage?
+    @State private var rescanOnDismiss = false
+    @State private var scannerError: String?
+    @State private var errorMessage = ""
+    @State private var showError = false
+    @State private var currentTicket: SavedItem?
+    @State private var currentQR: UIImage?
 
     // История уже сгенерированных QR
     @State private var showHistory = false
@@ -125,8 +102,9 @@ struct ContentView: View {
         return formatter.string(from: date)
     }
 
-    private var formattedCurrentDate: String {
-        formattedDate(Date())
+    private var canGenerate: Bool {
+        !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (sourceLink != link || normalizeBusNumber(caption) != nil)
     }
 
     var body: some View {
@@ -135,7 +113,7 @@ struct ContentView: View {
                 Color.white.ignoresSafeArea()
                 form
 
-                if showCard {
+                if showCard, let ticket = currentTicket, let image = currentQR {
                     ZStack(alignment: .top) {
                         backdrop
                             .ignoresSafeArea()
@@ -162,7 +140,7 @@ struct ContentView: View {
                     .transition(.opacity)
                     .zIndex(1)
 
-                    card(size: geo.size)
+                    card(size: geo.size, ticket: ticket, image: image)
                         .padding(.top, 130)
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
@@ -170,106 +148,25 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.light)
-        .sheet(isPresented: $showScanner) {
-            QRScannerView { scannedString, texts in
+        .sheet(isPresented: $showScanner, onDismiss: finishScannerPresentation) {
+            ScannerSheet(onScan: handleScannedResult, onError: { message in
+                scannerError = message
                 showScanner = false
-                handleScannedResult(link: scannedString, texts: texts)
-            }
+            })
         }
         // Шторка подтверждения с возможностью выбора распознанного текста
-        .sheet(isPresented: $showConfirmSheet) {
-            NavigationView {
-                VStack(spacing: 16) {
-                    Text("Отсканирован QR-код")
-                        .font(.headline)
-                        .padding(.top, 8)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Данные QR-кода:")
-                            .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
-                        Text(scannedLinkToConfirm)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.black)
-                            .lineLimit(2)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(white: 0.95))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-
-                    // Если камера поймала несколько текстов — показываем их для выбора
-                    if !detectedTexts.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Выберите нужную надпись с экрана:")
-                                .font(.footnote)
-                                .foregroundColor(Color(white: 0.5))
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(detectedTexts, id: \.self) { candidate in
-                                        Button {
-                                            confirmedCaption = candidate.uppercased()
-                                        } label: {
-                                            Text(candidate)
-                                                .font(.system(size: 14, weight: .medium))
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 8)
-                                                .background(confirmedCaption == candidate.uppercased() ? Color.black : Color(white: 0.92))
-                                                .foregroundColor(confirmedCaption == candidate.uppercased() ? .white : .black)
-                                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Итоговая подпись под QR:")
-                            .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
-                        TextField("Подпись под QR-кодом", text: $confirmedCaption)
-                            .textInputAutocapitalization(.characters)
-                            .padding()
-                            .background(Color(white: 0.95))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Текст сверху (необязательно):")
-                            .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
-                        TextField("Текст сверху", text: $confirmedTitle)
-                            .padding()
-                            .background(Color(white: 0.95))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-
-                    Spacer()
-                }
-                .padding(20)
-                .navigationTitle("Подтверждение вывода")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Отмена") {
-                            showConfirmSheet = false
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Вывести") {
-                            link = scannedLinkToConfirm
-                            caption = confirmedCaption
-                            title = confirmedTitle
-                            saveCurrent()
-                            showConfirmSheet = false
-                            openCard()
-                        }
-                        .bold()
-                    }
-                }
+        .sheet(isPresented: $showConfirmSheet, onDismiss: {
+            if rescanOnDismiss {
+                rescanOnDismiss = false
+                beginScan()
             }
+        }) {
+            scanConfirmation
+        }
+        .alert("QR-генератор", isPresented: $showError) {
+            Button("ОК", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
         }
         .confirmationDialog("Выберите действие", isPresented: $showActionSheet, presenting: selectedItemForAction) { item in
             Button("Вывести") {
@@ -382,48 +279,183 @@ struct ContentView: View {
         }
     }
 
+    private var scanConfirmation: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Text("Создать чек?")
+                        .font(.headline)
+                        .padding(.top, 8)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Данные QR-кода:")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        Text(scannedLinkToConfirm)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.black)
+                            .textSelection(.enabled)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(white: 0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if let confirmationQR, confirmationQR.cgImage != nil {
+                        Image(uiImage: confirmationQR)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 104, height: 104)
+                            .accessibilityLabel("QR-код на чеке")
+                    } else {
+                        Text("Эти данные не помещаются в QR-код чека.")
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                    }
+
+                    // Если камера поймала несколько текстов — показываем их для выбора
+                    if !detectedTexts.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Выберите нужную надпись с экрана:")
+                                .font(.footnote)
+                                .foregroundColor(Color(white: 0.5))
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(detectedTexts, id: \.self) { candidate in
+                                        Button {
+                                            confirmedCaption = candidate.uppercased()
+                                        } label: {
+                                            Text(candidate)
+                                                .font(.system(size: 14, weight: .medium))
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .background(confirmedCaption == candidate.uppercased() ? Color.black : Color(white: 0.92))
+                                                .foregroundColor(confirmedCaption == candidate.uppercased() ? .white : .black)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Номер автобуса:")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        TextField("837AY04", text: $confirmedCaption)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .padding()
+                                .background(Color(white: 0.95))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        if !confirmedCaption.isEmpty && normalizeBusNumber(confirmedCaption) == nil {
+                            Text("Проверьте формат номера, например 837AY04.")
+                                .font(.footnote)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Текст сверху (необязательно):")
+                            .font(.footnote)
+                            .foregroundColor(Color(white: 0.5))
+                        TextField("Текст сверху", text: $confirmedTitle)
+                            .padding()
+                            .background(Color(white: 0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    Button("Пересканировать") {
+                        rescanOnDismiss = true
+                        showConfirmSheet = false
+                    }
+                    .foregroundColor(.black)
+                }
+                .padding(20)
+            }
+            .navigationTitle("Подтверждение вывода")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        showConfirmSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Создать чек", action: confirmScan)
+                        .bold()
+                        .disabled(normalizeBusNumber(confirmedCaption) == nil || confirmationQR?.cgImage == nil)
+                }
+            }
+        }
+    }
+
     // MARK: - Перемещение используемого билета наверх
 
     private func touchItem(_ item: SavedItem) {
-        link = item.link
-        caption = item.caption
-        title = item.title
-        currentItemDate = item.date
-
-        var list = items
-        list.removeAll { $0.link == item.link }
-        list.insert(item, at: 0)
-        setItems(list)
-
-        openCard()
+        var ticket = item
+        if ticket.qrPayload == nil {
+            ticket.qrPayload = ticket.fromScan
+                ? ticket.link
+                : densePayload(makeTicketPayload(ticket.link, id: ticket.id), level: density)
+        }
+        openCard(ticket)
     }
 
     // MARK: - Обработка сканирования с выбором текстов
 
-    private func handleScannedResult(link scannedLink: String, texts: [String]) {
-        scannedLinkToConfirm = scannedLink
-        detectedTexts = texts
-        
-        // 1. Проверяем историю
-        if let existingItem = items.first(where: { $0.link == scannedLink }) {
-            confirmedCaption = existingItem.caption
-            confirmedTitle = existingItem.title
-            currentItemDate = existingItem.date
-        } 
-        // 2. Если есть распознанные тексты с камеры, берем первый (самый точный/близкий) по умолчанию
-        else if let firstText = texts.first {
-            confirmedCaption = firstText.uppercased()
-            confirmedTitle = title
-            currentItemDate = Date()
-        } 
-        // 3. Иначе берем то, что введено в поле
-        else {
-            confirmedCaption = caption
-            confirmedTitle = title
-            currentItemDate = Date()
+    private func beginScan() {
+        hideKeyboard()
+        guard DataScannerViewController.isSupported else {
+            presentError("Этот iPhone не поддерживает сканер VisionKit.")
+            return
         }
-        
-        showConfirmSheet = true
+        guard DataScannerViewController.isAvailable else {
+            presentError("Для сканирования разрешите доступ к камере в настройках.")
+            return
+        }
+        scannedLinkToConfirm = ""
+        scannerError = nil
+        showScanner = true
+    }
+
+    private func handleScannedResult(_ reading: ScanReading) {
+        scannedLinkToConfirm = reading.payload
+        confirmedCaption = reading.number ?? ""
+        confirmedTitle = title
+        detectedTexts = reading.candidates
+        confirmationQR = makeQR(from: reading.payload)
+        showScanner = false
+    }
+
+    private func finishScannerPresentation() {
+        if let scannerError {
+            presentError(scannerError)
+        } else if !scannedLinkToConfirm.isEmpty {
+            showConfirmSheet = true
+        }
+    }
+
+    private func confirmScan() {
+        guard let number = normalizeBusNumber(confirmedCaption),
+              let image = confirmationQR, image.cgImage != nil else { return }
+        let ticket = SavedItem(
+            link: scannedLinkToConfirm,
+            caption: number,
+            title: confirmedTitle,
+            qrPayload: scannedLinkToConfirm,
+            fromScan: true
+        )
+        showConfirmSheet = false
+        openCard(ticket, image: image)
+    }
+
+    private func presentError(_ message: String) {
+        errorMessage = message
+        showError = true
     }
 
     // MARK: - Главный экран
@@ -436,7 +468,13 @@ struct ContentView: View {
                 .padding(.top, 24)
 
             HStack(spacing: 8) {
-                TextField("Ссылка на сайт", text: $link)
+                TextField("Ссылка на сайт", text: Binding(
+                    get: { link },
+                    set: { value in
+                        if value != link { sourceLink = nil }
+                        link = value
+                    }
+                ))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
@@ -444,9 +482,7 @@ struct ContentView: View {
                     .background(Color(white: 0.95))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                Button {
-                    showScanner = true
-                } label: {
+                Button(action: beginScan) {
                     Image(systemName: "qrcode.viewfinder")
                         .font(.system(size: 22, weight: .medium))
                         .frame(width: 52, height: 52)
@@ -461,8 +497,7 @@ struct ContentView: View {
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            TextField("Подпись под QR-кодом", text: $caption)
-                .textInputAutocapitalization(.characters)
+            BusNumberField(text: $caption)
                 .padding()
                 .background(Color(white: 0.95))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -479,7 +514,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
 
                 if density > 0 && !link.isEmpty {
-                    Text("В коде: \(densePayload(link, level: density))")
+                    Text("В коде: \(sourceLink == link ? link : densePayload(link, level: density))")
                         .font(.caption2)
                         .foregroundColor(Color(white: 0.55))
                         .lineLimit(1)
@@ -489,19 +524,17 @@ struct ContentView: View {
 
             HStack(spacing: 12) {
                 Button {
-                    hideKeyboard()
-                    currentItemDate = Date()
-                    openCard()
+                    saveCurrent(open: true)
                 } label: {
                     Text("Создать QR-код")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(link.isEmpty ? Color(white: 0.75) : Color.black)
+                        .background(canGenerate ? Color.black : Color(white: 0.75))
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .disabled(link.isEmpty)
+                .disabled(!canGenerate)
 
                 Button {
                     hideKeyboard()
@@ -511,10 +544,10 @@ struct ContentView: View {
                         .font(.system(size: 20, weight: .medium))
                         .frame(width: 56, height: 52)
                         .background(Color(white: 0.95))
-                        .foregroundColor(link.isEmpty ? Color(white: 0.7) : .black)
+                        .foregroundColor(canGenerate ? .black : Color(white: 0.7))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .disabled(link.isEmpty)
+                .disabled(!canGenerate)
 
                 Button {
                     showHistory = true
@@ -589,12 +622,18 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private func saveCurrent() {
-        let new = SavedItem(link: link, caption: caption, title: title)
-        var list = items
-        list.removeAll { $0.link == new.link }
-        list.insert(new, at: 0)
-        setItems(list)
+    private func saveCurrent(open: Bool = false) {
+        guard canGenerate else { return }
+        let fromScan = sourceLink == link
+        let input = fromScan ? link : link.trimmingCharacters(in: .whitespacesAndNewlines)
+        let number = normalizeBusNumber(caption) ?? caption.uppercased()
+        var ticket = SavedItem(link: input, caption: number, title: title, fromScan: fromScan)
+        ticket.qrPayload = fromScan ? input : densePayload(makeTicketPayload(input, id: ticket.id), level: density)
+        if open {
+            openCard(ticket)
+        } else {
+            setItems(ticket.addedToHistory(items))
+        }
     }
 
     // MARK: - История
@@ -614,7 +653,7 @@ struct ContentView: View {
             showHistory = false
         } label: {
             HStack(spacing: 12) {
-                Image(uiImage: makeQR(from: item.link))
+                Image(uiImage: makeQR(from: item.payload))
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
@@ -657,9 +696,9 @@ struct ContentView: View {
 
     // MARK: - Карточка с QR
 
-    private func card(size: CGSize) -> some View {
-        let uniquePayload = link.contains("?") ? "\(link)&rnd=\(Int(Date().timeIntervalSince1970 * 1000))" : "\(link)?rnd=\(Int(Date().timeIntervalSince1970 * 1000))"
-        let image = makeQR(from: densePayload(uniquePayload, level: density))
+    private func card(size: CGSize, ticket: SavedItem, image: UIImage) -> some View {
+        let title = ticket.title
+        let caption = ticket.caption
         let full = size.height
         let collapsed = full * collapsedRatio
         let base = expanded ? full : collapsed
@@ -667,7 +706,7 @@ struct ContentView: View {
         let t = min(1, max(0, (h - collapsed) / max(full - collapsed, 1)))
         
         let qrSide = lerp(240, min(size.width - 56, 330), t)
-        let currentDateString = formattedDate(currentItemDate)
+        let currentDateString = formattedDate(ticket.date)
 
         return VStack(spacing: 0) {
             Capsule()
@@ -807,8 +846,20 @@ struct ContentView: View {
             }
     }
 
-    private func openCard() {
+    private func openCard(_ ticket: SavedItem, image: UIImage? = nil) {
+        let qr = image ?? makeQR(from: ticket.payload)
+        guard qr.cgImage != nil else {
+            presentError("Эти данные не помещаются в QR-код чека.")
+            return
+        }
         hideKeyboard()
+        setItems(ticket.addedToHistory(items))
+        link = ticket.link
+        caption = ticket.caption
+        title = ticket.title
+        sourceLink = ticket.fromScan ? ticket.link : nil
+        currentTicket = ticket
+        currentQR = qr
         expanded = false
         drag = 0
         
@@ -831,92 +882,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Надежный сканер QR + текста с долгой стабилизацией
-
-struct QRScannerView: UIViewControllerRepresentable {
-    var onScan: (String, [String]) -> Void
-
-    func makeUIViewController(context: Context) -> DataScannerViewController {
-        let scanner = DataScannerViewController(
-            recognizedDataTypes: [.barcode(symbologies: [.qr]), .text()],
-            qualityLevel: .accurate,
-            recognizesMultipleItems: true,
-            isGuidanceEnabled: true,
-            isHighlightingEnabled: true
-        )
-        scanner.delegate = context.coordinator
-        try? scanner.startScanning()
-        return scanner
-    }
-
-    func updateUIViewController(_ uiViewController: DataScannerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onScan: onScan)
-    }
-
-    class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        var onScan: (String, [String]) -> Void
-        var hasScanned = false
-
-        init(onScan: @escaping (String, [String]) -> Void) {
-            self.onScan = onScan
-        }
-
-        func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
-            guard !hasScanned else { return }
-            
-            // Задержка 1.5 секунды: камера успевает идеально сфокусироваться и распознать текст
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                guard !self.hasScanned else { return }
-                
-                var foundQrPayload: String? = nil
-                var qrCenterY: CGFloat = 0
-                
-                for item in allItems {
-                    if case let .barcode(code) = item, let payload = code.payloadStringValue {
-                        foundQrPayload = payload
-                        qrCenterY = (code.bounds.bottomRight.y + code.bounds.topLeft.y) / 2
-                        break
-                    }
-                }
-                
-                guard let payload = foundQrPayload else { return }
-                
-                var textCandidates: [(text: String, distance: CGFloat)] = []
-                
-                for item in allItems {
-                    if case let .text(textObj) = item {
-                        let textString = textObj.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !textString.isEmpty, textString.count < 30 else { continue }
-                        
-                        let textCenterY = (textObj.bounds.bottomRight.y + textObj.bounds.topLeft.y) / 2
-                        let distance = abs(qrCenterY - textCenterY)
-                        
-                        if distance < 350 {
-                            textCandidates.append((text: textString, distance: distance))
-                        }
-                    }
-                }
-                
-                textCandidates.sort { $0.distance < $1.distance }
-                
-                var uniqueTexts: [String] = []
-                for candidate in textCandidates {
-                    if !uniqueTexts.contains(candidate.text) {
-                        uniqueTexts.append(candidate.text)
-                    }
-                }
-                
-                self.hasScanned = true
-                DispatchQueue.main.async {
-                    self.onScan(payload, uniqueTexts)
-                }
-            }
-        }
-    }
-}
-
 struct TopRounded: Shape {
     var radius: CGFloat
     func path(in rect: CGRect) -> Path {
@@ -928,14 +893,22 @@ struct TopRounded: Shape {
     }
 }
 
+private let qrImageContext = CIContext()
+
 func makeQR(from string: String) -> UIImage {
-    let context = CIContext()
+    guard !string.isEmpty else { return UIImage() }
     let filter = CIFilter.qrCodeGenerator()
     filter.message = Data(string.utf8)
     filter.correctionLevel = "M"
-    guard let output = filter.outputImage else { return UIImage() }
+    if let image = renderQR(filter.outputImage) { return image }
+    filter.correctionLevel = "L"
+    return renderQR(filter.outputImage) ?? UIImage()
+}
+
+private func renderQR(_ output: CIImage?) -> UIImage? {
+    guard let output, !output.extent.isEmpty else { return nil }
     let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
-    guard let cg = context.createCGImage(scaled, from: scaled.extent) else { return UIImage() }
+    guard let cg = qrImageContext.createCGImage(scaled, from: scaled.extent) else { return nil }
     return UIImage(cgImage: cg)
 }
 
@@ -982,7 +955,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
 
-            Text("Сумма 100 ₸")
+            Text("Сумма 80 ₸")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)
