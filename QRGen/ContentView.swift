@@ -52,19 +52,11 @@ struct ContentView: View {
     // История уже сгенерированных QR
     @State private var showHistory = false
 
-    // Состояния для меню действий и редактирования сохранённых
-    @State private var selectedItemForAction: SavedItem? = nil
-    @State private var showActionSheet = false
-    @State private var showEditModal = false
-    @State private var editingItem: SavedItem? = nil
-    @State private var editCaption = ""
-    @State private var editTitle = ""
-
     private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
 
     private var items: [SavedItem] {
-        (try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? []
+        ((try? JSONDecoder().decode([SavedItem].self, from: Data(savedData.utf8))) ?? []).inHistoryOrder()
     }
 
     private func setItems(_ new: [SavedItem]) {
@@ -74,10 +66,10 @@ struct ContentView: View {
         }
     }
 
-    private func updateItem(_ updatedItem: SavedItem) {
+    private func togglePin(_ id: UUID) {
         var list = items
-        if let index = list.firstIndex(where: { $0.id == updatedItem.id }) {
-            list[index] = updatedItem
+        if let index = list.firstIndex(where: { $0.id == id }) {
+            list[index].togglePin()
             setItems(list)
         }
     }
@@ -86,10 +78,11 @@ struct ContentView: View {
         a + (b - a) * t
     }
 
-    private func formattedDate(_ date: Date) -> String {
+    private func formattedDate(_ date: Date?) -> String {
+        guard let date else { return "Дата создания не сохранена" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMMM yyyy HH:mm"
+        formatter.dateFormat = "d MMMM yyyy HH:mm:ss"
         return formatter.string(from: date)
     }
 
@@ -141,66 +134,13 @@ struct ContentView: View {
         .preferredColorScheme(.light)
         .sheet(isPresented: $showScanner) {
             ScanFlowSheet(initialTitle: title) { ticket, image in
-                openCard(ticket, image: image)
+                openCard(ticket, image: image, recordCreation: true)
             }
         }
         .alert("QR-генератор", isPresented: $showError) {
             Button("ОК", role: .cancel) {}
         } message: {
             Text(errorMessage)
-        }
-        .confirmationDialog("Выберите действие", isPresented: $showActionSheet, presenting: selectedItemForAction) { item in
-            Button("Вывести") {
-                touchItem(item)
-            }
-            Button("Изменить") {
-                editingItem = item
-                editCaption = item.caption
-                editTitle = item.title
-                showEditModal = true
-            }
-            Button("Отмена", role: .cancel) {}
-        } message: { item in
-            let textToShow = !item.caption.isEmpty ? item.caption.uppercased() : (!item.title.isEmpty ? item.title : item.link)
-            Text("Элемент: «\(textToShow)»")
-        }
-        .sheet(isPresented: $showEditModal) {
-            NavigationView {
-                VStack(spacing: 16) {
-                    TextField("Подпись под QR-кодом", text: $editCaption)
-                        .textInputAutocapitalization(.characters)
-                        .padding()
-                        .background(Color(white: 0.95))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                    TextField("Текст сверху (необязательно)", text: $editTitle)
-                        .padding()
-                        .background(Color(white: 0.95))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                    Spacer()
-                }
-                .padding(20)
-                .navigationTitle("Редактировать")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Отмена") {
-                            showEditModal = false
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Сохранить") {
-                            if var item = editingItem {
-                                item.caption = editCaption
-                                item.title = editTitle
-                                updateItem(item)
-                            }
-                            showEditModal = false
-                        }
-                    }
-                }
-            }
         }
         // Экран истории уже сгенерированных QR-кодов
         .sheet(isPresented: $showHistory) {
@@ -260,16 +200,15 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Перемещение используемого билета наверх
+    private func openSaved(_ item: SavedItem) {
+        showHistory = false
+        openCard(item)
+    }
 
-    private func touchItem(_ item: SavedItem) {
-        var ticket = item
-        if ticket.qrPayload == nil {
-            ticket.qrPayload = ticket.fromScan
-                ? ticket.link
-                : densePayload(makeTicketPayload(ticket.link, id: ticket.id), level: density)
-        }
-        openCard(ticket)
+    private func repeatSaved(_ item: SavedItem) {
+        showHistory = false
+        let ticket = item.repeated { densePayload($0, level: density) }
+        openCard(ticket, recordCreation: true)
     }
 
     // MARK: - Обработка сканирования с выбором текстов
@@ -402,7 +341,7 @@ struct ContentView: View {
             }
 
             if !items.isEmpty {
-                Text("Сохранённые")
+                Text("История чеков")
                     .font(.headline)
                     .foregroundColor(.black)
                     .padding(.top, 8)
@@ -423,38 +362,87 @@ struct ContentView: View {
         .padding(.horizontal, 20)
     }
 
-    private func row(_ item: SavedItem) -> some View {
-        let primary: String = !item.caption.isEmpty ? item.caption.uppercased()
+    private func row(_ item: SavedItem, showsQR: Bool = false) -> some View {
+        let primary = !item.caption.isEmpty ? item.caption.uppercased()
             : (!item.title.isEmpty ? item.title : item.link)
 
         return HStack(spacing: 12) {
             Button {
-                selectedItemForAction = item
-                showActionSheet = true
+                openSaved(item)
             } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(primary)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                        .lineLimit(1)
-                    if primary != item.link {
-                        Text(item.link)
-                            .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
-                            .lineLimit(1)
+                HStack(spacing: 12) {
+                    if showsQR {
+                        Image(uiImage: makeQR(from: item.payload))
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            Button {
-                setItems(items.filter { $0.id != item.id })
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color(white: 0.55))
-                    .padding(8)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            if item.pinnedAt != nil {
+                                Image(systemName: "pin.fill")
+                                    .font(.caption)
+                                    .accessibilityLabel("Закреплён")
+                            }
+                            Text(primary)
+                                .font(.system(size: 16, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.black)
+
+                        Text(formattedDate(item.date))
+                            .font(.caption)
+                            .foregroundColor(Color(white: 0.5))
+                        if primary != item.link {
+                            Text(item.link)
+                                .font(.footnote)
+                                .foregroundColor(Color(white: 0.5))
+                                .lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Открывает чек с исходным временем")
+
+            Menu {
+                Button { openSaved(item) } label: {
+                    Label("Открыть оригинал", systemImage: "doc.text")
+                }
+                Button { repeatSaved(item) } label: {
+                    Label("Повторить с текущим временем", systemImage: "arrow.clockwise")
+                }
+                Button { togglePin(item.id) } label: {
+                    Label(
+                        item.pinnedAt == nil ? "Закрепить" : "Открепить",
+                        systemImage: item.pinnedAt == nil ? "pin" : "pin.slash"
+                    )
+                }
+                Button {
+                    fillForm(from: item)
+                    showHistory = false
+                } label: {
+                    Label("Изменить копию", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    setItems(items.filter { $0.id != item.id })
+                } label: {
+                    Label("Удалить", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(Color(white: 0.5))
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Действия с чеком")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -467,11 +455,15 @@ struct ContentView: View {
         let fromScan = sourceLink == link
         let input = fromScan ? link : link.trimmingCharacters(in: .whitespacesAndNewlines)
         let number = normalizeBusNumber(caption) ?? caption.uppercased()
-        var ticket = SavedItem(link: input, caption: number, title: title, fromScan: fromScan)
-        ticket.qrPayload = fromScan ? input : densePayload(makeTicketPayload(input, id: ticket.id), level: density)
+        let ticket = SavedItem(link: input, caption: number, title: title, fromScan: fromScan)
+            .repeated { densePayload($0, level: density) }
         if open {
-            openCard(ticket)
+            openCard(ticket, recordCreation: true)
         } else {
+            guard makeQR(from: ticket.payload).cgImage != nil else {
+                presentError("Эти данные не помещаются в QR-код чека.")
+                return
+            }
             setItems(ticket.addedToHistory(items))
         }
     }
@@ -479,49 +471,7 @@ struct ContentView: View {
     // MARK: - История
 
     private func historyRow(_ item: SavedItem) -> some View {
-        let primary: String = !item.caption.isEmpty ? item.caption.uppercased()
-            : (!item.title.isEmpty ? item.title : item.link)
-        let dateString: String = {
-            let f = DateFormatter()
-            f.locale = Locale(identifier: "ru_RU")
-            f.dateFormat = "d MMMM yyyy, HH:mm"
-            return f.string(from: item.date)
-        }()
-
-        return Button {
-            touchItem(item)
-            showHistory = false
-        } label: {
-            HStack(spacing: 12) {
-                Image(uiImage: makeQR(from: item.payload))
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 64, height: 64)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(primary)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.black)
-                        .lineLimit(2)
-                    Text(item.link)
-                        .font(.footnote)
-                        .foregroundColor(Color(white: 0.5))
-                        .lineLimit(1)
-                    Text(dateString)
-                        .font(.caption2)
-                        .foregroundColor(Color(white: 0.55))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Color(white: 0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .buttonStyle(PlainButtonStyle())
-        }
+        row(item, showsQR: true)
     }
 
     private func deleteHistoryItems(offsets: IndexSet) {
@@ -688,18 +638,22 @@ struct ContentView: View {
             }
     }
 
-    private func openCard(_ ticket: SavedItem, image: UIImage? = nil) {
+    private func fillForm(from ticket: SavedItem) {
+        link = ticket.link
+        caption = ticket.caption
+        title = ticket.title
+        sourceLink = ticket.fromScan ? ticket.link : nil
+    }
+
+    private func openCard(_ ticket: SavedItem, image: UIImage? = nil, recordCreation: Bool = false) {
         let qr = image ?? makeQR(from: ticket.payload)
         guard qr.cgImage != nil else {
             presentError("Эти данные не помещаются в QR-код чека.")
             return
         }
         hideKeyboard()
-        setItems(ticket.addedToHistory(items))
-        link = ticket.link
-        caption = ticket.caption
-        title = ticket.title
-        sourceLink = ticket.fromScan ? ticket.link : nil
+        if recordCreation { setItems(ticket.addedToHistory(items)) }
+        fillForm(from: ticket)
         currentTicket = ticket
         currentQR = qr
         expanded = false

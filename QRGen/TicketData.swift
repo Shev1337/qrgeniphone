@@ -5,12 +5,13 @@ struct SavedItem: Codable, Identifiable, Equatable {
     var link: String
     var caption: String
     var title: String
-    var date: Date
+    var date: Date?
     var qrPayload: String?
     var fromScan: Bool
+    var pinnedAt: Date?
 
     private enum CodingKeys: String, CodingKey {
-        case id, link, caption, title, date, qrPayload, fromScan
+        case id, link, caption, title, date, qrPayload, fromScan, pinnedAt
     }
 
     init(
@@ -18,9 +19,10 @@ struct SavedItem: Codable, Identifiable, Equatable {
         link: String,
         caption: String,
         title: String,
-        date: Date = Date(),
+        date: Date? = Date(),
         qrPayload: String? = nil,
-        fromScan: Bool = false
+        fromScan: Bool = false,
+        pinnedAt: Date? = nil
     ) {
         self.id = id
         self.link = link
@@ -29,6 +31,7 @@ struct SavedItem: Codable, Identifiable, Equatable {
         self.date = date
         self.qrPayload = qrPayload
         self.fromScan = fromScan
+        self.pinnedAt = pinnedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -37,17 +40,43 @@ struct SavedItem: Codable, Identifiable, Equatable {
         link = (try? container.decode(String.self, forKey: .link)) ?? ""
         caption = (try? container.decode(String.self, forKey: .caption)) ?? ""
         title = (try? container.decode(String.self, forKey: .title)) ?? ""
-        date = (try? container.decode(Date.self, forKey: .date)) ?? Date()
+        date = try? container.decode(Date.self, forKey: .date)
         qrPayload = try? container.decode(String.self, forKey: .qrPayload)
         fromScan = (try? container.decode(Bool.self, forKey: .fromScan)) ?? false
+        pinnedAt = try? container.decode(Date.self, forKey: .pinnedAt)
     }
 
     var payload: String { qrPayload ?? link }
 
     func addedToHistory(_ items: [SavedItem]) -> [SavedItem] {
-        [self] + items.filter { item in
-            item.id != id && !(item.link == link && item.title == title
-                && item.caption.caseInsensitiveCompare(caption) == .orderedSame)
+        [self] + items.filter { $0.id != id }
+    }
+
+    func repeated(at now: Date = Date(), formatManualPayload: (String) -> String) -> SavedItem {
+        let newID = UUID()
+        return SavedItem(
+            id: newID,
+            link: link,
+            caption: caption,
+            title: title,
+            date: now,
+            qrPayload: fromScan ? payload : formatManualPayload(makeTicketPayload(link, id: newID)),
+            fromScan: fromScan
+        )
+    }
+
+    mutating func togglePin(at now: Date = Date()) {
+        pinnedAt = pinnedAt == nil ? now : nil
+    }
+}
+
+extension Array where Element == SavedItem {
+    func inHistoryOrder() -> [SavedItem] {
+        sorted { lhs, rhs in
+            let leftPin = lhs.pinnedAt ?? .distantPast
+            let rightPin = rhs.pinnedAt ?? .distantPast
+            if leftPin != rightPin { return leftPin > rightPin }
+            return (lhs.date ?? .distantPast) > (rhs.date ?? .distantPast)
         }
     }
 }

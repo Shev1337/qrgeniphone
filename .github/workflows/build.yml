@@ -23,6 +23,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
       - run: xcodegen generate
+      - name: Check ticket history
+        run: |
+          swiftc QRGen/TicketData.swift Tests/TicketHistoryChecks.swift -o "$RUNNER_TEMP/ticket-history-checks"
+          "$RUNNER_TEMP/ticket-history-checks"
       - name: Build
         run: |
           xcodebuild -project QRGen.xcodeproj -scheme QRGen -configuration Release \
