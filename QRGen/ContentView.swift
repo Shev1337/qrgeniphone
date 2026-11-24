@@ -82,7 +82,7 @@ struct ContentView: View {
         guard let date else { return "Дата создания не сохранена" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMMM yyyy HH:mm:ss"
+        formatter.dateFormat = "d MMMM yyyy HH:mm"
         return formatter.string(from: date)
     }
 
