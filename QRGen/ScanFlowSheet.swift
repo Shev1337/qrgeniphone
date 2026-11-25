@@ -125,15 +125,15 @@ private struct ScanConfirmationView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Данные QR-кода:")
                             .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
+                            .foregroundColor(Brand.muted)
                         Text(review.reading.payload)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.black)
+                            .foregroundColor(Brand.ink)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("scan.review.payload")
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(white: 0.95))
+                            .background(Brand.blush)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
@@ -148,7 +148,7 @@ private struct ScanConfirmationView: View {
                     } else {
                         Text("Не удалось создать QR-код из считанных данных.")
                             .font(.footnote)
-                            .foregroundColor(.red)
+                            .foregroundColor(Brand.error)
                     }
 
                     // Если камера поймала несколько текстов — показываем их для выбора
@@ -156,7 +156,7 @@ private struct ScanConfirmationView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Выберите нужную надпись с экрана:")
                                 .font(.footnote)
-                                .foregroundColor(Color(white: 0.5))
+                                .foregroundColor(Brand.muted)
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
@@ -168,8 +168,8 @@ private struct ScanConfirmationView: View {
                                                 .font(.system(size: 14, weight: .medium))
                                                 .padding(.horizontal, 12)
                                                 .padding(.vertical, 8)
-                                                .background(confirmedCaption == candidate.uppercased() ? Color.black : Color(white: 0.92))
-                                                .foregroundColor(confirmedCaption == candidate.uppercased() ? .white : .black)
+                                                .background(confirmedCaption == candidate.uppercased() ? Brand.coral : Brand.blush)
+                                                .foregroundColor(confirmedCaption == candidate.uppercased() ? .white : Brand.ink)
                                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                         }
                                     }
@@ -181,37 +181,38 @@ private struct ScanConfirmationView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Номер автобуса:")
                             .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
+                            .foregroundColor(Brand.muted)
                         TextField("837AY04", text: $confirmedCaption)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .padding()
-                            .background(Color(white: 0.95))
+                            .background(Brand.blush)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                             .accessibilityIdentifier("scan.review.number")
                         if !confirmedCaption.isEmpty && normalizeBusNumber(confirmedCaption) == nil {
                             Text("Проверьте формат номера, например 837AY04.")
                                 .font(.footnote)
-                                .foregroundColor(.red)
+                                .foregroundColor(Brand.error)
                         }
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Текст сверху (необязательно):")
                             .font(.footnote)
-                            .foregroundColor(Color(white: 0.5))
+                            .foregroundColor(Brand.muted)
                         TextField("Текст сверху", text: $confirmedTitle)
                             .padding()
-                            .background(Color(white: 0.95))
+                            .background(Brand.blush)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
                     Button("Пересканировать", action: onRescan)
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.coral)
                         .accessibilityIdentifier("scan.review.rescan")
                 }
                 .padding(20)
             }
+            .background(Brand.paper)
             .navigationTitle("Подтверждение вывода")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -53,7 +53,6 @@ struct ContentView: View {
     // История уже сгенерированных QR
     @State private var showHistory = false
 
-    private let backdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
     private let collapsedRatio: CGFloat = 0.82
 
     private var items: [SavedItem] {
@@ -99,28 +98,32 @@ struct ContentView: View {
                 if showServices {
                     form
                 } else {
-                    StartScreen(onScan: beginScan, onServices: { showServices = true })
+                    StartScreen(
+                        onScan: beginScan,
+                        onServices: { showServices = true },
+                        onHistory: { showHistory = true }
+                    )
                 }
 
                 if showCard, let ticket = currentTicket, let image = currentQR {
                     ZStack(alignment: .top) {
-                        backdrop
+                        Brand.blush
                             .ignoresSafeArea()
                             .onTapGesture { close() }
 
                         VStack(spacing: 8) {
                             Text("Билет Avtobys. Оплата проезда")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.black)
+                                .foregroundColor(Brand.ink)
                                 .padding(.top, 6)
 
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
-                                    .foregroundStyle(Color.white, Color(hex: "169402"))
+                                    .foregroundStyle(Color.white, Brand.success)
                                 Text("Ваш платеж принят")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.black)
+                                    .foregroundColor(Brand.ink)
                                     .padding(.top, 6)
                             }
                             .padding(.top, 6)
@@ -137,6 +140,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.light)
+        .tint(Brand.coral)
         .sheet(isPresented: $showScanner) {
             ScanFlowSheet(initialTitle: title) { ticket, image in
                 openCard(ticket, image: image, recordCreation: true)
@@ -155,13 +159,13 @@ struct ContentView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "clock")
                                 .font(.system(size: 56))
-                                .foregroundColor(Color(white: 0.55))
+                                .foregroundColor(Brand.muted)
                             Text("История пуста")
                                 .font(.headline)
-                                .foregroundColor(.black)
+                                .foregroundColor(Brand.ink)
                             Text("Сгенерированные QR-коды будут появляться здесь")
                                 .font(.footnote)
-                                .foregroundColor(Color(white: 0.55))
+                                .foregroundColor(Brand.muted)
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.top, 60)
@@ -174,6 +178,8 @@ struct ContentView: View {
                             .onDelete(perform: deleteHistoryItems)
                         }
                         .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .background(Brand.paper)
                     }
                 }
                 .navigationTitle("История QR-кодов")
@@ -251,7 +257,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "chevron.backward")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.ink)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -260,7 +266,7 @@ struct ContentView: View {
 
                 Text("QR-генератор")
                     .font(.largeTitle.bold())
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
             }
             .padding(.top, 24)
 
@@ -276,15 +282,15 @@ struct ContentView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .padding()
-                    .background(Color(white: 0.95))
+                    .background(Brand.blush)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                 Button(action: beginScan) {
                     Image(systemName: "qrcode.viewfinder")
                         .font(.system(size: 22, weight: .medium))
                         .frame(width: 52, height: 52)
-                        .background(Color(white: 0.95))
-                        .foregroundColor(.black)
+                        .background(Brand.blush)
+                        .foregroundColor(Brand.ink)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .accessibilityLabel("Сканировать QR-код")
@@ -293,18 +299,18 @@ struct ContentView: View {
 
             TextField("Текст сверху (необязательно)", text: $title)
                 .padding()
-                .background(Color(white: 0.95))
+                .background(Brand.blush)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
             BusNumberField(text: $caption)
                 .padding()
-                .background(Color(white: 0.95))
+                .background(Brand.blush)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Плотность QR-кода")
                     .font(.footnote)
-                    .foregroundColor(Color(white: 0.5))
+                    .foregroundColor(Brand.muted)
                 Picker("Плотность QR-кода", selection: $density) {
                     Text("Обычная").tag(0)
                     Text("Плотная").tag(1)
@@ -315,7 +321,7 @@ struct ContentView: View {
                 if density > 0 && !link.isEmpty {
                     Text("В коде: \(sourceLink == link ? link : densePayload(link, level: density))")
                         .font(.caption2)
-                        .foregroundColor(Color(white: 0.55))
+                        .foregroundColor(Brand.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -329,7 +335,7 @@ struct ContentView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(canGenerate ? Color.black : Color(white: 0.75))
+                        .background(canGenerate ? Brand.coral : Brand.disabled)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
@@ -342,8 +348,8 @@ struct ContentView: View {
                     Image(systemName: "bookmark")
                         .font(.system(size: 20, weight: .medium))
                         .frame(width: 56, height: 52)
-                        .background(Color(white: 0.95))
-                        .foregroundColor(canGenerate ? .black : Color(white: 0.7))
+                        .background(Brand.blush)
+                        .foregroundColor(canGenerate ? Brand.coral : Brand.outline)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(!canGenerate)
@@ -354,8 +360,8 @@ struct ContentView: View {
                     Image(systemName: "clock.fill")
                         .font(.system(size: 20, weight: .medium))
                         .frame(width: 56, height: 52)
-                        .background(Color(white: 0.95))
-                        .foregroundColor(.black)
+                        .background(Brand.blush)
+                        .foregroundColor(Brand.ink)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
             }
@@ -363,7 +369,7 @@ struct ContentView: View {
             if !items.isEmpty {
                 Text("История чеков")
                     .font(.headline)
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
                     .padding(.top, 8)
 
                 ScrollView {
@@ -412,15 +418,15 @@ struct ContentView: View {
                                 .font(.system(size: 16, weight: .semibold))
                                 .lineLimit(1)
                         }
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.ink)
 
                         Text(formattedDate(item.date))
                             .font(.caption)
-                            .foregroundColor(Color(white: 0.5))
+                            .foregroundColor(Brand.muted)
                         if primary != item.link {
                             Text(item.link)
                                 .font(.footnote)
-                                .foregroundColor(Color(white: 0.5))
+                                .foregroundColor(Brand.muted)
                                 .lineLimit(1)
                         }
                     }
@@ -458,7 +464,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(white: 0.5))
+                    .foregroundColor(Brand.muted)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
@@ -466,7 +472,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color(white: 0.95))
+        .background(Brand.blush)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -520,7 +526,7 @@ struct ContentView: View {
 
         return VStack(spacing: 0) {
             Capsule()
-                .fill(Color(white: 0.8))
+                .fill(Brand.outline)
                 .frame(width: 40, height: 5)
                 .padding(.top, 8)
                 .padding(.bottom, 2)
@@ -532,7 +538,7 @@ struct ContentView: View {
                 if !title.isEmpty {
                     Text(title)
                         .font(.system(size: lerp(20, 26, t), weight: .bold))
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -542,7 +548,7 @@ struct ContentView: View {
                 Button { close() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.ink)
                         .padding(8)
                 }
             }
@@ -562,7 +568,7 @@ struct ContentView: View {
 
             Text("Покажите QR-код контроллеру")
                 .font(.system(size: lerp(12, 14, t), weight: .regular))
-                .foregroundColor(Color(white: 0.45))
+                .foregroundColor(Brand.muted)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 32)
@@ -571,7 +577,7 @@ struct ContentView: View {
             if !caption.isEmpty {
                 Text(caption.uppercased())
                     .font(.system(size: lerp(16, 22, t), weight: .bold))
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
@@ -582,11 +588,11 @@ struct ContentView: View {
             VStack(spacing: 2) {
                 Text(currentDateString)
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
 
                 Text("Сумма 80 ₸")
                     .font(.system(size: lerp(12, 14, t), weight: .light))
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
@@ -605,7 +611,7 @@ struct ContentView: View {
                         Text("Квитанция")
                             .font(.caption)
                     }
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
                 }
 
                 ShareLink(
@@ -618,7 +624,7 @@ struct ContentView: View {
                         Text("Поделиться")
                             .font(.caption)
                     }
-                    .foregroundColor(.black)
+                    .foregroundColor(Brand.ink)
                 }
             }
             .padding(.bottom, 24)
@@ -734,7 +740,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         if !title.isEmpty {
             Text(title)
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.black)
+                .foregroundColor(Brand.ink)
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
         }
@@ -742,10 +748,10 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(Color.white, Color(hex: "169402"))
+                .foregroundStyle(Color.white, Brand.success)
             Text("Успешно")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.black)
+                .foregroundColor(Brand.ink)
         }
         
         Image(uiImage: image)
@@ -756,24 +762,24 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         
         Text("Покажите QR-код")
             .font(.system(size: 24, weight: .regular))
-            .foregroundColor(Color(white: 0.45))
+            .foregroundColor(Brand.muted)
             .multilineTextAlignment(.center)
 
         if !caption.isEmpty {
             Text(caption.uppercased())
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.black)
+                .foregroundColor(Brand.ink)
                 .multilineTextAlignment(.center)
         }
 
         VStack(spacing: 2) {
             Text(dateString)
                 .font(.system(size: 22, weight: .regular))
-                .foregroundColor(.black)
+                .foregroundColor(Brand.ink)
 
             Text("Сумма 80 ₸")
                 .font(.system(size: 22, weight: .light))
-                .foregroundColor(.black)
+                .foregroundColor(Brand.ink)
                 .multilineTextAlignment(.center)
         }
     }

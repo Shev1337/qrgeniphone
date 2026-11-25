@@ -1,4 +1,5 @@
 import AVFoundation
+import ImageIO
 import SwiftUI
 import VisionKit
 
@@ -27,9 +28,9 @@ struct ScannerSheet: View {
                 Button { setTorch(!torchOn) } label: {
                     Image(systemName: torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
+                        .foregroundColor(Brand.coral)
                         .frame(width: 44, height: 44)
-                        .background(.white)
+                        .background(Brand.blush)
                         .clipShape(Circle())
                 }
                 .accessibilityLabel(torchOn ? "Выключить фонарик" : "Включить фонарик")
@@ -46,9 +47,9 @@ struct ScannerSheet: View {
                         .font(.subheadline.bold())
                 }
             }
-            .foregroundColor(.black)
+            .foregroundColor(Brand.ink)
             .padding(12)
-            .background(.white)
+            .background(Brand.paper)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .padding(16)
         }
@@ -113,9 +114,8 @@ struct QRScannerView: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(view: self) }
 
     static func dismantleUIViewController(_ scanner: DataScannerViewController, coordinator: Coordinator) {
-        coordinator.didFinish = true
         scanner.delegate = nil
-        scanner.stopScanning()
+        coordinator.stop(scanner)
     }
 
     @MainActor
@@ -125,6 +125,14 @@ struct QRScannerView: UIViewControllerRepresentable {
         private var consensus = ScanNumberConsensus()
         private var previousReading: ScanReading?
         private var nextZoomTime: TimeInterval = 0
+        private var nextPhotoTime: TimeInterval = 0
+        private var targetSince: TimeInterval = 0
+        private var targetLastSeen: TimeInterval = 0
+        private var targetPayload: String?
+        private var recoveredNumber: String?
+        private var recoveredAt: TimeInterval = 0
+        private var recoveryAttempts = 0
+        private var recoveryTask: Task<Void, Never>?
 
         init(view: QRScannerView) { self.view = view }
 
@@ -147,7 +155,20 @@ struct QRScannerView: UIViewControllerRepresentable {
         func fail() {
             guard !didFinish else { return }
             didFinish = true
+            recoveryTask?.cancel()
             view.onError("Не удалось запустить сканер. Проверьте доступ к камере в настройках.")
+        }
+
+        func stop(_ scanner: DataScannerViewController) {
+            didFinish = true
+            recoveryTask?.cancel()
+            scanner.stopScanning()
+        }
+
+        private func finish(_ scanner: DataScannerViewController, payload: String, number: String, candidates: [String]) {
+            guard !didFinish else { return }
+            stop(scanner)
+            view.onScan(ScanReading(payload: payload, number: number, candidates: candidates))
         }
 
         private func analyze(_ items: [RecognizedItem], scanner: DataScannerViewController) {
@@ -186,14 +207,52 @@ struct QRScannerView: UIViewControllerRepresentable {
             }
 
             let now = ProcessInfo.processInfo.systemUptime
+            if targetPayload != code.payload || now - targetLastSeen > 3 {
+                targetPayload = code.payload
+                targetSince = now
+                recoveryAttempts = 0
+                recoveredNumber = nil
+            }
+            targetLastSeen = now
+
             if let number = candidates.first ?? qrNumber {
-                if candidates.isEmpty || consensus.isStable(payload: code.payload, number: number, now: now) {
-                    didFinish = true
-                    scanner.stopScanning()
-                    view.onScan(ScanReading(payload: code.payload, number: number, candidates: candidates))
+                if candidates.isEmpty || consensus.isStable(payload: code.payload, number: number, now: now)
+                    || (number == recoveredNumber && now - recoveredAt < 6) {
+                    finish(scanner, payload: code.payload, number: number, candidates: candidates)
                 }
-            } else if now >= nextZoomTime, zoomForSmallQR(code.bounds, scanner: scanner) {
-                nextZoomTime = now + 0.9
+                return
+            }
+
+            if now >= nextZoomTime, zoomForSmallQR(code.bounds, scanner: scanner) {
+                nextZoomTime = now + 0.8
+                nextPhotoTime = max(nextPhotoTime, now + 0.55)
+            }
+            if recoveryTask == nil, recoveryAttempts < 4, now >= nextPhotoTime, now - targetSince >= 1.0 {
+                tryStillFrame(scanner, payload: code.payload, now: now)
+            }
+        }
+
+        private func tryStillFrame(_ scanner: DataScannerViewController, payload: String, now: TimeInterval) {
+            recoveryAttempts += 1
+            nextPhotoTime = now + 2
+            recoveryTask = Task { [weak self, weak scanner] in
+                guard let self else { return }
+                defer { self.recoveryTask = nil }
+                guard let scanner, !Task.isCancelled,
+                      let photo = try? await scanner.capturePhoto(), let image = photo.cgImage else { return }
+                let orientation = photo.imageOrientation.visionOrientation
+                let reading = await Task.detached(priority: .userInitiated) {
+                    ScanPhotoRecovery.busNumber(in: image, orientation: orientation, matching: payload)
+                }.value
+                let completedAt = ProcessInfo.processInfo.systemUptime
+                guard !Task.isCancelled, !self.didFinish, self.targetPayload == payload,
+                      completedAt - self.targetLastSeen < 3, let number = reading else { return }
+                if self.recoveredNumber == number && completedAt - self.recoveredAt < 6 {
+                    self.finish(scanner, payload: payload, number: number, candidates: [number])
+                } else {
+                    self.recoveredNumber = number
+                    self.recoveredAt = completedAt
+                }
             }
         }
 
@@ -205,9 +264,9 @@ struct QRScannerView: UIViewControllerRepresentable {
             // Keep the area where the number should appear below the QR in frame.
             let horizontalExtent = abs(qr.midX - viewfinder.midX) + qrSize * 0.8
             let verticalExtent = max(abs(qr.minY - viewfinder.midY), abs(qr.maxY + qrSize - viewfinder.midY))
-            let zoomLimit = min(scanner.maxZoomFactor, scanner.minZoomFactor * 2.5)
+            let zoomLimit = min(scanner.maxZoomFactor, scanner.minZoomFactor * 3.2)
             let step = min(
-                min(viewfinder.width, viewfinder.height) * 0.33 / qrSize,
+                min(viewfinder.width, viewfinder.height) * 0.39 / qrSize,
                 viewfinder.width * 0.48 / horizontalExtent,
                 viewfinder.height * 0.48 / verticalExtent,
                 zoomLimit / scanner.zoomFactor
@@ -232,7 +291,7 @@ private func numbersBelow(_ qr: CGRect, labels: [(number: String, bounds: CGRect
     let ranked: [(number: String, distance: CGFloat)] = labels.compactMap { label in
         let down = label.bounds.midY - qr.maxY
         let across = abs(label.bounds.midX - qr.midX)
-        guard down > 0, down <= qr.height * 1.25, across <= qr.width * 0.85 else { return nil }
+        guard down > 0, down <= qr.height * 1.45, across <= qr.width * 0.90 else { return nil }
         return (label.number, down + across)
     }
     var seen = Set<String>()
@@ -243,4 +302,20 @@ private func numbersBelow(_ qr: CGRect, labels: [(number: String, bounds: CGRect
 
 private extension CGRect {
     var area: CGFloat { width * height }
+}
+
+private extension UIImage.Orientation {
+    var visionOrientation: CGImagePropertyOrientation {
+        switch self {
+        case .up: return .up
+        case .upMirrored: return .upMirrored
+        case .down: return .down
+        case .downMirrored: return .downMirrored
+        case .left: return .left
+        case .leftMirrored: return .leftMirrored
+        case .right: return .right
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
+        }
+    }
 }

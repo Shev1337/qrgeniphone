@@ -3,13 +3,7 @@ import SwiftUI
 struct StartScreen: View {
     let onScan: () -> Void
     let onServices: () -> Void
-
-    private let ink = Color(hex: "30252B")
-    private let muted = Color(hex: "715C64")
-    private let coral = Color(hex: "B83C4E")
-    private let blush = Color(hex: "FBE9EA")
-    private let line = Color(hex: "F0DBDE")
-    private let paper = Color(hex: "FFF8F7")
+    let onHistory: () -> Void
 
     private let plannedSections = [
         ("Магазины", "cart"), ("Госуслуги", "building.columns"),
@@ -39,29 +33,40 @@ struct StartScreen: View {
         HStack(spacing: 11) {
             Image(systemName: "ticket")
                 .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(coral)
+                .foregroundStyle(Brand.coral)
                 .frame(width: 42, height: 42)
-                .background(blush, in: RoundedRectangle(cornerRadius: 14))
+                .background(Brand.blush, in: RoundedRectangle(cornerRadius: 14))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("QRGen").font(.headline.bold()).foregroundStyle(ink)
-                Text("Рабочее место контролёра").font(.caption).foregroundStyle(muted)
+                Text("QRGen").font(.headline.bold()).foregroundStyle(Brand.ink)
+                Text("Рабочее место контролёра").font(.caption).foregroundStyle(Brand.muted)
             }
+            Spacer(minLength: 8)
+            Button(action: onHistory) {
+                Image(systemName: "clock")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Brand.coral)
+                    .frame(width: 44, height: 42)
+                    .background(Brand.blush, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("История чеков")
+            .accessibilityIdentifier("history.open.home")
         }
     }
 
     private var searchPreview: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(muted)
+                .foregroundStyle(Brand.muted)
                 .accessibilityHidden(true)
-            Text("Поиск по разделам").font(.subheadline).foregroundStyle(muted)
+            Text("Поиск по разделам").font(.subheadline).foregroundStyle(Brand.muted)
             Spacer(minLength: 6)
-            Text("Скоро").font(.caption.weight(.medium)).foregroundStyle(coral)
+            Text("Скоро").font(.caption.weight(.medium)).foregroundStyle(Brand.coral)
         }
         .padding(13)
-        .background(paper, in: RoundedRectangle(cornerRadius: 16))
+        .background(Brand.paper, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
     }
 
@@ -103,7 +108,7 @@ struct StartScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Будущие разделы")
                 .font(.headline)
-                .foregroundStyle(ink)
+                .foregroundStyle(Brand.ink)
                 .accessibilityAddTraits(.isHeader)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
@@ -112,19 +117,19 @@ struct StartScreen: View {
                     HStack(spacing: 8) {
                         Image(systemName: symbol)
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(coral)
+                            .foregroundStyle(Brand.coral)
                             .frame(width: 21)
                             .accessibilityHidden(true)
                         Text(title)
                             .font(.footnote.weight(.medium))
-                            .foregroundStyle(ink)
+                            .foregroundStyle(Brand.ink)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 9)
                     .frame(minHeight: 54)
                     .background(.white, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(line) }
+                    .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Brand.line) }
                 }
             }
         }
@@ -132,19 +137,19 @@ struct StartScreen: View {
 
     private var navigationBar: some View {
         HStack(spacing: 0) {
-            tabLabel("Главная", icon: "house", tint: coral)
+            tabLabel("Главная", icon: "house", tint: Brand.coral)
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isSelected)
 
             Button(action: onScan) {
-                tabLabel("QR", icon: "qrcode.viewfinder", tint: coral, emphasized: true)
+                tabLabel("QR", icon: "qrcode.viewfinder", tint: Brand.coral, emphasized: true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Сканировать QR-код")
             .accessibilityIdentifier("scan.open")
 
             Button(action: onServices) {
-                tabLabel("Сервисы", icon: "square.grid.2x2", tint: ink)
+                tabLabel("Сервисы", icon: "square.grid.2x2", tint: Brand.ink)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("services.open")
@@ -154,7 +159,7 @@ struct StartScreen: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 5)
         .background(.white)
-        .overlay(alignment: .top) { Divider().overlay(line) }
+        .overlay(alignment: .top) { Divider().overlay(Brand.line) }
     }
 
     private func tabLabel(_ title: String, icon: String, tint: Color, emphasized: Bool = false) -> some View {
@@ -163,7 +168,7 @@ struct StartScreen: View {
                 .font(.system(size: 21, weight: .medium))
                 .padding(.horizontal, 11)
                 .padding(.vertical, 4)
-                .background(emphasized ? blush : .clear, in: RoundedRectangle(cornerRadius: 13))
+                .background(emphasized ? Brand.blush : .clear, in: RoundedRectangle(cornerRadius: 13))
                 .accessibilityHidden(true)
             Text(title).font(.caption.weight(.semibold))
         }
