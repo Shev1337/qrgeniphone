@@ -32,6 +32,8 @@ final class ScanFlowTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 10))
         if verifyServices {
+            XCTAssertTrue(app.staticTexts["Магазины"].exists)
+            XCTAssertFalse(app.buttons["Магазины"].exists)
             app.buttons["services.open"].tap()
             XCTAssertTrue(app.staticTexts["QR-генератор"].waitForExistence(timeout: 5))
             app.buttons["services.back"].tap()
