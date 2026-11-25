@@ -5,7 +5,7 @@ on:
     branches: [main]
 jobs:
   test-scan:
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +18,7 @@ jobs:
             -destination "platform=iOS Simulator,id=$device_id" -parallel-testing-enabled NO \
             -derivedDataPath build-tests -resultBundlePath ScanFlowTests.xcresult test
   build:
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
