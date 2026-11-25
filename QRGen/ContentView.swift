@@ -38,6 +38,7 @@ struct ContentView: View {
 
     @State private var caption = "04"
     @State private var sourceLink: String?
+    @State private var showServices = false
     @State private var showCard = false
     @State private var showScanner = false
     @State private var expanded = false
@@ -95,7 +96,11 @@ struct ContentView: View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
                 Color.white.ignoresSafeArea()
-                form
+                if showServices {
+                    form
+                } else {
+                    StartScreen(onScan: beginScan, onServices: { showServices = true })
+                }
 
                 if showCard, let ticket = currentTicket, let image = currentQR {
                     ZStack(alignment: .top) {
@@ -235,14 +240,29 @@ struct ContentView: View {
         showError = true
     }
 
-    // MARK: - Главный экран
+    // MARK: - Сервисы
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("QR-генератор")
-                .font(.largeTitle.bold())
-                .foregroundColor(.black)
-                .padding(.top, 24)
+            HStack(spacing: 8) {
+                Button {
+                    hideKeyboard()
+                    showServices = false
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.black)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("На главный экран")
+                .accessibilityIdentifier("services.back")
+
+                Text("QR-генератор")
+                    .font(.largeTitle.bold())
+                    .foregroundColor(.black)
+            }
+            .padding(.top, 24)
 
             HStack(spacing: 8) {
                 TextField("Ссылка на сайт", text: Binding(

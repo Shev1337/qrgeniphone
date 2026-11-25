@@ -13,7 +13,7 @@ final class ScanFlowTests: XCTestCase {
 
     @MainActor
     func testRescanReplacesTheEntireReview() {
-        let app = launchScanner()
+        let app = launchScanner(verifyServices: true)
         readQRCode(in: app)
         verifyReview(in: app, scan: 1, number: "721BG04")
 
@@ -25,11 +25,18 @@ final class ScanFlowTests: XCTestCase {
     }
 
     @MainActor
-    private func launchScanner() -> XCUIApplication {
+    private func launchScanner(verifyServices: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments.append("--ui-test-scanner")
         app.launch()
+        XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 10))
+        if verifyServices {
+            app.buttons["services.open"].tap()
+            XCTAssertTrue(app.staticTexts["QR-генератор"].waitForExistence(timeout: 5))
+            app.buttons["services.back"].tap()
+            XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 5))
+        }
         let scanner = app.buttons["scan.open"]
         XCTAssertTrue(scanner.waitForExistence(timeout: 10))
         scanner.tap()
