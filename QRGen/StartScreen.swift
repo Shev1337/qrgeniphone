@@ -4,6 +4,7 @@ struct StartScreen: View {
     let onScan: () -> Void
     let onServices: () -> Void
     let onHistory: () -> Void
+    let onSwitchAppearance: () -> Void
 
     private let plannedSections = [
         ("Магазины", "cart"), ("Госуслуги", "building.columns"),
@@ -31,12 +32,7 @@ struct StartScreen: View {
 
     private var brand: some View {
         HStack(spacing: 11) {
-            Image("AppBrandMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .accessibilityHidden(true)
+            AppearanceMark(imageName: "AppBrandMark", onSwitch: onSwitchAppearance)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("QRArest").font(.headline.bold()).foregroundStyle(Brand.ink)

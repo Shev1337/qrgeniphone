@@ -39,12 +39,14 @@ struct ContentView: View {
     @AppStorage("savedTitle") private var title = ""
     @AppStorage("savedItems") private var savedData = ""
     @AppStorage("density") private var density = 0
+    @AppStorage("usesClassicAppearance") private var usesClassicAppearance = false
 
     @State private var caption = "04"
     @State private var sourceLink: String?
     @State private var showServices = false
     @State private var showCard = false
     @State private var showScanner = false
+    @State private var changingIcon = false
     @State private var manualConfirmation: ReceiptDraft?
     @State private var expanded = false
     @State private var drag: CGFloat = 0
@@ -103,15 +105,26 @@ struct ContentView: View {
                 Color.white.ignoresSafeArea()
                 if showServices {
                     form
-                } else {
+                        .accessibilityHidden(showCard)
+                } else if usesClassicAppearance {
                     StartScreen(
                         onScan: beginScan,
                         onServices: { showServices = true },
-                        onHistory: { showHistory = true }
+                        onHistory: { showHistory = true },
+                        onSwitchAppearance: toggleAppearance
                     )
+                    .accessibilityHidden(showCard)
+                } else {
+                    BlueStartScreen(
+                        onScan: beginScan,
+                        onServices: { showServices = true },
+                        onHistory: { showHistory = true },
+                        onSwitchAppearance: toggleAppearance
+                    )
+                    .accessibilityHidden(showCard)
                 }
 
-                if showCard, let ticket = currentTicket, let image = currentQR {
+                if showCard, let ticket = currentTicket, let image = currentQR, usesClassicAppearance {
                     ZStack(alignment: .top) {
                         ticketBackdrop
                             .ignoresSafeArea()
@@ -142,11 +155,28 @@ struct ContentView: View {
                         .padding(.top, 130)
                         .transition(.move(edge: .bottom))
                         .zIndex(2)
+                } else if showCard, let ticket = currentTicket, let image = currentQR {
+                    let date = formattedDate(ticket.date)
+                    BlueReceiptView(
+                        ticket: ticket,
+                        image: image,
+                        date: date,
+                        onClose: close,
+                        onPrint: { printQR(image: image, title: ticket.title, caption: ticket.caption, dateString: date) }
+                    )
+                    .transition(.opacity)
+                    .zIndex(2)
                 }
             }
         }
         .preferredColorScheme(.light)
         .tint(Brand.coral)
+        .onAppear {
+            let app = UIApplication.shared
+            if !ScanFlowSheet.usesTestScanner, app.supportsAlternateIcons {
+                usesClassicAppearance = app.alternateIconName == "AppIcon"
+            }
+        }
         .sheet(isPresented: $showScanner) {
             ScanFlowSheet(initialTitle: title) { ticket, image in
                 openCard(ticket, image: image, recordCreation: true)
@@ -179,6 +209,34 @@ struct ContentView: View {
                 UIScreen.main.brightness = 1.0
             } else {
                 UIScreen.main.brightness = originalBrightness
+            }
+        }
+    }
+
+    private func toggleAppearance() {
+        guard !changingIcon else { return }
+        let nextIsClassic = !usesClassicAppearance
+        let alternateName = nextIsClassic ? "AppIcon" : nil
+        let app = UIApplication.shared
+        if ScanFlowSheet.usesTestScanner || app.alternateIconName == alternateName {
+            usesClassicAppearance = nextIsClassic
+            return
+        }
+        guard app.supportsAlternateIcons else {
+            usesClassicAppearance = nextIsClassic
+            presentError("Системная иконка недоступна на этом устройстве.")
+            return
+        }
+        changingIcon = true
+        app.setAlternateIconName(alternateName) { error in
+            let didChange = error == nil
+            Task { @MainActor in
+                changingIcon = false
+                if didChange {
+                    usesClassicAppearance = nextIsClassic
+                } else {
+                    presentError("Не удалось сменить системную иконку.")
+                }
             }
         }
     }

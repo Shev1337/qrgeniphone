@@ -48,6 +48,29 @@ final class ScanFlowTests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
         XCTAssertTrue(app.images["ticket.qr"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Чек QRArest"].exists)
+    }
+
+    @MainActor
+    func testHoldLogoSwitchesAndRemembersAppearance() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments.append("--ui-test-scanner")
+        app.launch()
+
+        let mark = app.descendants(matching: .any).matching(identifier: "appearance.toggle").firstMatch
+        let classicOnly = app.staticTexts["Магазины"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 10))
+        if classicOnly.exists { mark.press(forDuration: 1) }
+        XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 5))
+        mark.press(forDuration: 1)
+        XCTAssertTrue(classicOnly.waitForExistence(timeout: 5))
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(classicOnly.waitForExistence(timeout: 10))
+        mark.press(forDuration: 1)
+        XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -62,8 +85,7 @@ final class ScanFlowTests: XCTestCase {
             XCTAssertTrue(app.navigationBars["История чеков"].waitForExistence(timeout: 5))
             app.buttons["Закрыть"].tap()
             XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.staticTexts["Магазины"].exists)
-            XCTAssertFalse(app.buttons["Магазины"].exists)
+            XCTAssertTrue(app.buttons["services.open.manual"].exists)
             app.buttons["services.open"].tap()
             XCTAssertTrue(app.staticTexts["QR-генератор"].waitForExistence(timeout: 5))
             app.buttons["services.back"].tap()
