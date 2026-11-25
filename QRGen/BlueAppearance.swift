@@ -19,7 +19,11 @@ struct AppearanceMark: View {
             .scaledToFit()
             .frame(width: 44, height: 44)
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .onLongPressGesture(minimumDuration: 0.7, perform: onSwitch)
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                LongPressGesture(minimumDuration: 0.7, maximumDistance: 22)
+                    .onEnded { _ in onSwitch() }
+            )
             .accessibilityLabel("Значок QRArest")
             .accessibilityIdentifier("appearance.toggle")
             .accessibilityAction(named: Text("Сменить оформление"), onSwitch)

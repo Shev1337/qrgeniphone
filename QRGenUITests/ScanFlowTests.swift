@@ -58,19 +58,24 @@ final class ScanFlowTests: XCTestCase {
         app.launchArguments.append("--ui-test-scanner")
         app.launch()
 
-        let mark = app.descendants(matching: .any).matching(identifier: "appearance.toggle").firstMatch
         let classicOnly = app.staticTexts["Магазины"]
-        XCTAssertTrue(mark.waitForExistence(timeout: 10))
-        if classicOnly.exists { mark.press(forDuration: 1) }
+        if classicOnly.exists { holdAppearanceMark(in: app) }
         XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 5))
-        mark.press(forDuration: 1)
+        holdAppearanceMark(in: app)
         XCTAssertTrue(classicOnly.waitForExistence(timeout: 5))
 
         app.terminate()
         app.launch()
         XCTAssertTrue(classicOnly.waitForExistence(timeout: 10))
-        mark.press(forDuration: 1)
-        XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 5))
+        holdAppearanceMark(in: app)
+        XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 10))
+    }
+
+    @MainActor
+    private func holdAppearanceMark(in app: XCUIApplication) {
+        let mark = app.images["appearance.toggle"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 10))
+        mark.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 1.4)
     }
 
     @MainActor
