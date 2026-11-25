@@ -61,14 +61,26 @@ final class ScanFlowTests: XCTestCase {
         let classicOnly = app.staticTexts["Магазины"]
         if classicOnly.exists { holdAppearanceMark(in: app) }
         XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 5))
+        verifyServicesAppearance(in: app, expected: "blue", unexpected: "classic")
         holdAppearanceMark(in: app)
         XCTAssertTrue(classicOnly.waitForExistence(timeout: 5))
 
         app.terminate()
         app.launch()
         XCTAssertTrue(classicOnly.waitForExistence(timeout: 10))
+        verifyServicesAppearance(in: app, expected: "classic", unexpected: "blue")
         holdAppearanceMark(in: app)
         XCTAssertTrue(app.buttons["services.open.manual"].waitForExistence(timeout: 10))
+    }
+
+    @MainActor
+    private func verifyServicesAppearance(in app: XCUIApplication, expected: String, unexpected: String) {
+        let services = app.buttons["services.open"]
+        XCTAssertTrue(services.waitForExistence(timeout: 5))
+        services.tap()
+        XCTAssertTrue(app.textFields["services.payload.\(expected)"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["services.payload.\(unexpected)"].exists)
+        app.buttons["services.back"].tap()
     }
 
     @MainActor
