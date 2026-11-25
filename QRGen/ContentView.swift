@@ -103,26 +103,27 @@ struct ContentView: View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
                 Color.white.ignoresSafeArea()
-                if showServices {
-                    form
-                        .accessibilityHidden(showCard)
-                } else if usesClassicAppearance {
-                    StartScreen(
-                        onScan: beginScan,
-                        onServices: { showServices = true },
-                        onHistory: { showHistory = true },
-                        onSwitchAppearance: toggleAppearance
-                    )
-                    .accessibilityHidden(showCard)
-                } else {
-                    BlueStartScreen(
-                        onScan: beginScan,
-                        onServices: { showServices = true },
-                        onHistory: { showHistory = true },
-                        onSwitchAppearance: toggleAppearance
-                    )
-                    .accessibilityHidden(showCard)
+                Group {
+                    if showServices {
+                        form
+                    } else if usesClassicAppearance {
+                        StartScreen(
+                            onScan: beginScan,
+                            onServices: { showServices = true },
+                            onHistory: { showHistory = true },
+                            onSwitchAppearance: toggleAppearance
+                        )
+                    } else {
+                        BlueStartScreen(
+                            onScan: beginScan,
+                            onServices: { showServices = true },
+                            onHistory: { showHistory = true },
+                            onSwitchAppearance: toggleAppearance
+                        )
+                    }
                 }
+                .blur(radius: showCard && !usesClassicAppearance ? 5 : 0)
+                .accessibilityHidden(showCard)
 
                 if showCard, let ticket = currentTicket, let image = currentQR, usesClassicAppearance {
                     ZStack(alignment: .top) {
@@ -160,9 +161,10 @@ struct ContentView: View {
                     BlueReceiptView(
                         ticket: ticket,
                         image: image,
-                        date: date,
                         onClose: close,
-                        onPrint: { printQR(image: image, title: ticket.title, caption: ticket.caption, dateString: date) }
+                        onPrint: {
+                            printQR(image: image, title: ticket.title, caption: ticket.caption, dateString: date, isDemo: true)
+                        }
                     )
                     .transition(.opacity)
                     .zIndex(2)
@@ -889,7 +891,7 @@ private func renderQR(_ output: CIImage?) -> UIImage? {
 }
 
 @MainActor
-func printQR(image: UIImage, title: String, caption: String, dateString: String) {
+func printQR(image: UIImage, title: String, caption: String, dateString: String, isDemo: Bool = false) {
     let content = VStack(spacing: 14) {
         if !title.isEmpty {
             Text(title)
@@ -899,13 +901,19 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .multilineTextAlignment(.center)
         }
         
-        VStack(spacing: 4) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(Color.white, ticketSuccess)
-            Text("Успешно")
-                .font(.system(size: 16, weight: .semibold))
+        if isDemo {
+            Text("Демо-билет")
+                .font(.system(size: 28, weight: .bold))
                 .foregroundColor(.black)
+        } else {
+            VStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Color.white, ticketSuccess)
+                Text("Успешно")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.black)
+            }
         }
         
         Image(uiImage: image)
