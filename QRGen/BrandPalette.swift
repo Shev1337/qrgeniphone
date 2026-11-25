@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum Brand {
+    static let burgundy = Color(hex: "742D43")
     static let ink = Color(hex: "30252B")
     static let muted = Color(hex: "715C64")
     static let coral = Color(hex: "B83C4E")

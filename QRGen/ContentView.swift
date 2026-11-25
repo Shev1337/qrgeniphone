@@ -52,6 +52,7 @@ struct ContentView: View {
 
     // История уже сгенерированных QR
     @State private var showHistory = false
+    @State private var confirmClearHistory = false
 
     private let collapsedRatio: CGFloat = 0.82
 
@@ -146,60 +147,13 @@ struct ContentView: View {
                 openCard(ticket, image: image, recordCreation: true)
             }
         }
-        .alert("QR-генератор", isPresented: $showError) {
+        .alert("QRArest", isPresented: $showError) {
             Button("ОК", role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
-        // Экран истории уже сгенерированных QR-кодов
         .sheet(isPresented: $showHistory) {
-            NavigationView {
-                VStack(spacing: 0) {
-                    if items.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 56))
-                                .foregroundColor(Brand.muted)
-                            Text("История пуста")
-                                .font(.headline)
-                                .foregroundColor(Brand.ink)
-                            Text("Сгенерированные QR-коды будут появляться здесь")
-                                .font(.footnote)
-                                .foregroundColor(Brand.muted)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.top, 60)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        List {
-                            ForEach(items) { item in
-                                historyRow(item)
-                            }
-                            .onDelete(perform: deleteHistoryItems)
-                        }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .background(Brand.paper)
-                    }
-                }
-                .navigationTitle("История QR-кодов")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Закрыть") {
-                            showHistory = false
-                        }
-                    }
-                    if !items.isEmpty {
-                        ToolbarItem(placement: .destructiveAction) {
-                            Button("Очистить всё", role: .destructive) {
-                                setItems([])
-                                showHistory = false
-                            }
-                        }
-                    }
-                }
-            }
+            historySheet
         }
         .onChange(of: showCard) { isOpen in
             if isOpen {
@@ -212,11 +166,13 @@ struct ContentView: View {
     }
 
     private func openSaved(_ item: SavedItem) {
+        hideKeyboard()
         showHistory = false
         openCard(item)
     }
 
     private func repeatSaved(_ item: SavedItem) {
+        hideKeyboard()
         showHistory = false
         let ticket = item.repeated { densePayload($0, level: density) }
         openCard(ticket, recordCreation: true)
@@ -249,68 +205,117 @@ struct ContentView: View {
     // MARK: - Сервисы
 
     private var form: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
+        let recent = items.prefix(3)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
                 Button {
                     hideKeyboard()
                     showServices = false
                 } label: {
-                    Image(systemName: "chevron.backward")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(Brand.ink)
-                        .frame(width: 44, height: 44)
+                    Label("Главная", systemImage: "chevron.backward")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Brand.burgundy)
+                        .padding(.horizontal, 13)
+                        .frame(minHeight: 44)
+                        .background(.white, in: Capsule())
                         .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("На главный экран")
                 .accessibilityIdentifier("services.back")
 
                 Text("QR-генератор")
-                    .font(.largeTitle.bold())
-                    .foregroundColor(Brand.ink)
-            }
-            .padding(.top, 24)
+                    .font(.system(.largeTitle, design: .serif, weight: .medium))
+                    .foregroundStyle(Brand.ink)
+                    .accessibilityAddTraits(.isHeader)
 
-            HStack(spacing: 8) {
-                TextField("Ссылка на сайт", text: Binding(
-                    get: { link },
-                    set: { value in
-                        if value != link { sourceLink = nil }
-                        link = value
+                serviceFields
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(action: openHistory) {
+                        HStack {
+                            Label("История чеков", systemImage: "clock")
+                                .font(.headline)
+                                .foregroundStyle(Brand.ink)
+                            Spacer(minLength: 10)
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Brand.burgundy)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 48)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
                     }
-                ))
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("history.open.services")
+
+                    ForEach(recent) { item in
+                        row(item)
+                    }
+                }
+            }
+            .frame(maxWidth: 550, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background { Brand.paper.ignoresSafeArea() }
+    }
+
+    private var serviceFields: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            serviceField("Данные QR-кода") {
+                HStack(spacing: 8) {
+                    TextField("Ссылка или текст", text: Binding(
+                        get: { link },
+                        set: { value in
+                            if value != link { sourceLink = nil }
+                            link = value
+                        }
+                    ))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
-                    .padding()
-                    .background(Brand.blush)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(Brand.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .frame(minHeight: 48)
+                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
 
-                Button(action: beginScan) {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 22, weight: .medium))
-                        .frame(width: 52, height: 52)
-                        .background(Brand.blush)
-                        .foregroundColor(Brand.ink)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    Button(action: beginScan) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(Brand.burgundy)
+                            .frame(width: 48, height: 48)
+                            .background(Brand.blush, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Сканировать QR-код")
+                    .accessibilityIdentifier("scan.open")
                 }
-                .accessibilityLabel("Сканировать QR-код")
-                .accessibilityIdentifier("scan.open")
             }
 
-            TextField("Текст сверху (необязательно)", text: $title)
-                .padding()
-                .background(Brand.blush)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            serviceField("Номер автобуса") {
+                BusNumberField(text: $caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .frame(minHeight: 48)
+                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
+            }
 
-            BusNumberField(text: $caption)
-                .padding()
-                .background(Brand.blush)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            serviceField("Текст на чеке") {
+                TextField("Необязательно", text: $title)
+                    .accessibilityLabel("Текст на чеке")
+                    .foregroundStyle(Brand.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .frame(minHeight: 48)
+                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
+            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Плотность QR-кода")
-                    .font(.footnote)
-                    .foregroundColor(Brand.muted)
+            serviceField("Плотность QR-кода") {
                 Picker("Плотность QR-кода", selection: $density) {
                     Text("Обычная").tag(0)
                     Text("Плотная").tag(1)
@@ -321,24 +326,26 @@ struct ContentView: View {
                 if density > 0 && !link.isEmpty {
                     Text("В коде: \(sourceLink == link ? link : densePayload(link, level: density))")
                         .font(.caption2)
-                        .foregroundColor(Brand.muted)
+                        .foregroundStyle(Brand.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button {
                     saveCurrent(open: true)
                 } label: {
                     Text("Создать QR-код")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canGenerate ? Brand.coral : Brand.disabled)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .font(.headline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(canGenerate ? .white : Brand.muted)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(canGenerate ? Brand.burgundy : Brand.blush, in: RoundedRectangle(cornerRadius: 13))
                 }
+                .buttonStyle(.plain)
                 .disabled(!canGenerate)
 
                 Button {
@@ -346,49 +353,37 @@ struct ContentView: View {
                     saveCurrent()
                 } label: {
                     Image(systemName: "bookmark")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 56, height: 52)
-                        .background(Brand.blush)
-                        .foregroundColor(canGenerate ? Brand.coral : Brand.outline)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(canGenerate ? Brand.burgundy : Brand.outline)
+                        .frame(width: 50, height: 50)
+                        .background(Brand.blush, in: RoundedRectangle(cornerRadius: 13))
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Сохранить чек")
                 .disabled(!canGenerate)
-
-                Button {
-                    showHistory = true
-                } label: {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 56, height: 52)
-                        .background(Brand.blush)
-                        .foregroundColor(Brand.ink)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-            }
-
-            if !items.isEmpty {
-                Text("История чеков")
-                    .font(.headline)
-                    .foregroundColor(Brand.ink)
-                    .padding(.top, 8)
-
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(items) { item in
-                            row(item)
-                        }
-                    }
-                    .padding(.bottom, 20)
-                }
-                .scrollDismissesKeyboard(.interactively)
-            } else {
-                Spacer()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(16)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Brand.line)
+                .allowsHitTesting(false)
+        }
     }
 
-    private func row(_ item: SavedItem, showsQR: Bool = false) -> some View {
+    private func serviceField<Content: View>(
+        _ label: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Brand.muted)
+            content()
+        }
+    }
+
+    private func row(_ item: SavedItem) -> some View {
         let primary = !item.caption.isEmpty ? item.caption.uppercased()
             : (!item.title.isEmpty ? item.title : item.link)
 
@@ -397,37 +392,27 @@ struct ContentView: View {
                 openSaved(item)
             } label: {
                 HStack(spacing: 12) {
-                    if showsQR {
-                        Image(uiImage: makeQR(from: item.payload))
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
+                    Image(systemName: item.pinnedAt == nil ? "doc.text" : "pin.fill")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(Brand.burgundy)
+                        .frame(width: 40, height: 40)
+                        .background(Brand.blush, in: RoundedRectangle(cornerRadius: 11))
+                        .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 5) {
-                            if item.pinnedAt != nil {
-                                Image(systemName: "pin.fill")
-                                    .font(.caption)
-                                    .accessibilityLabel("Закреплён")
-                            }
-                            Text(primary)
-                                .font(.system(size: 16, weight: .semibold))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(Brand.ink)
-
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(primary)
+                            .font(.headline)
+                            .foregroundStyle(Brand.ink)
+                            .lineLimit(1)
                         Text(formattedDate(item.date))
-                            .font(.caption)
-                            .foregroundColor(Brand.muted)
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(Brand.muted)
                         if primary != item.link {
                             Text(item.link)
-                                .font(.footnote)
-                                .foregroundColor(Brand.muted)
+                                .font(.caption)
+                                .foregroundStyle(Brand.muted)
                                 .lineLimit(1)
+                                .truncationMode(.middle)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,6 +420,7 @@ struct ContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(item.pinnedAt == nil ? "" : "Закреплён")
             .accessibilityHint("Открывает чек с исходным временем")
 
             Menu {
@@ -452,28 +438,34 @@ struct ContentView: View {
                 }
                 Button {
                     fillForm(from: item)
+                    showServices = true
                     showHistory = false
                 } label: {
                     Label("Изменить копию", systemImage: "pencil")
                 }
                 Button(role: .destructive) {
-                    setItems(items.filter { $0.id != item.id })
+                    deleteItem(item.id)
                 } label: {
                     Label("Удалить", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Brand.muted)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Brand.burgundy)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Действия с чеком")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Brand.blush)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.leading, 12)
+        .padding(.trailing, 5)
+        .padding(.vertical, 11)
+        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Brand.line)
+                .allowsHitTesting(false)
+        }
     }
 
     private func saveCurrent(open: Bool = false) {
@@ -496,14 +488,108 @@ struct ContentView: View {
 
     // MARK: - История
 
-    private func historyRow(_ item: SavedItem) -> some View {
-        row(item, showsQR: true)
+    private func openHistory() {
+        hideKeyboard()
+        showHistory = true
     }
 
-    private func deleteHistoryItems(offsets: IndexSet) {
-        var list = items
-        list.remove(atOffsets: offsets)
-        setItems(list)
+    private var historySheet: some View {
+        let history = items
+        let pinned = history.filter { $0.pinnedAt != nil }
+        let unpinned = history.filter { $0.pinnedAt == nil }
+
+        return NavigationStack {
+            Group {
+                if history.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "clock")
+                            .font(.title2.weight(.medium))
+                            .foregroundStyle(Brand.burgundy)
+                            .frame(width: 54, height: 54)
+                            .background(Brand.blush, in: RoundedRectangle(cornerRadius: 16))
+                            .accessibilityHidden(true)
+                        Text("История пока пуста")
+                            .font(.headline)
+                            .foregroundStyle(Brand.ink)
+                        Text("Здесь появятся созданные чеки")
+                            .font(.subheadline)
+                            .foregroundStyle(Brand.muted)
+                    }
+                    .multilineTextAlignment(.center)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        if !pinned.isEmpty {
+                            historySection("Закреплённые", receipts: pinned)
+                        }
+                        if !unpinned.isEmpty {
+                            historySection(pinned.isEmpty ? "Все чеки" : "Остальные чеки", receipts: unpinned)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: 590)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .background { Brand.paper.ignoresSafeArea() }
+            .navigationTitle("История чеков")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Brand.paper, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { showHistory = false }
+                }
+                if !history.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button(role: .destructive) {
+                                confirmClearHistory = true
+                            } label: {
+                                Label("Очистить историю", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .accessibilityLabel("Действия с историей")
+                    }
+                }
+            }
+            .confirmationDialog("Удалить все чеки из истории?", isPresented: $confirmClearHistory, titleVisibility: .visible) {
+                Button("Удалить все чеки", role: .destructive) { setItems([]) }
+                Button("Отмена", role: .cancel) {}
+            }
+        }
+        .tint(Brand.burgundy)
+    }
+
+    private func historySection(_ title: String, receipts: [SavedItem]) -> some View {
+        Section {
+            ForEach(receipts) { item in
+                row(item)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            deleteItem(item.id)
+                        } label: {
+                            Label("Удалить", systemImage: "trash")
+                        }
+                    }
+            }
+        } header: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Brand.muted)
+                .textCase(nil)
+        }
+    }
+
+    private func deleteItem(_ id: UUID) {
+        setItems(items.filter { $0.id != id })
     }
 
     private func hideKeyboard() {

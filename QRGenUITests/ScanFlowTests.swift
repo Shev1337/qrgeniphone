@@ -33,7 +33,7 @@ final class ScanFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 10))
         if verifyServices {
             app.buttons["history.open.home"].tap()
-            XCTAssertTrue(app.navigationBars["История QR-кодов"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["История чеков"].waitForExistence(timeout: 5))
             app.buttons["Закрыть"].tap()
             XCTAssertTrue(app.staticTexts["QR и чеки"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.staticTexts["Магазины"].exists)

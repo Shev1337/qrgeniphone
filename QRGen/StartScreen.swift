@@ -31,15 +31,15 @@ struct StartScreen: View {
 
     private var brand: some View {
         HStack(spacing: 11) {
-            Image(systemName: "ticket")
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(Brand.coral)
+            Image("AppBrandMark")
+                .resizable()
+                .scaledToFit()
                 .frame(width: 42, height: 42)
-                .background(Brand.blush, in: RoundedRectangle(cornerRadius: 14))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("QRGen").font(.headline.bold()).foregroundStyle(Brand.ink)
+                Text("QRArest").font(.headline.bold()).foregroundStyle(Brand.ink)
                 Text("Рабочее место контролёра").font(.caption).foregroundStyle(Brand.muted)
             }
             Spacer(minLength: 8)
