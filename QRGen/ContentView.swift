@@ -2,6 +2,10 @@ import SwiftUI
 import CoreImage.CIFilterBuiltins
 import VisionKit
 
+private let ticketBackdrop = Color(red: 0.85, green: 0.86, blue: 0.88)
+private let ticketSuccess = Color(hex: "169402")
+private let ticketHint = Color(white: 0.45)
+
 // MARK: - Надежное расширение для работы с HEX-цветами в SwiftUI
 extension Color {
     init(hex: String) {
@@ -108,23 +112,23 @@ struct ContentView: View {
 
                 if showCard, let ticket = currentTicket, let image = currentQR {
                     ZStack(alignment: .top) {
-                        Brand.blush
+                        ticketBackdrop
                             .ignoresSafeArea()
                             .onTapGesture { close() }
 
                         VStack(spacing: 8) {
                             Text("Билет Avtobys. Оплата проезда")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(Brand.ink)
+                                .foregroundColor(.black)
                                 .padding(.top, 6)
 
                             VStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 60))
-                                    .foregroundStyle(Color.white, Brand.success)
+                                    .foregroundStyle(Color.white, ticketSuccess)
                                 Text("Ваш платеж принят")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Brand.ink)
+                                    .foregroundColor(.black)
                                     .padding(.top, 6)
                             }
                             .padding(.top, 6)
@@ -612,7 +616,7 @@ struct ContentView: View {
 
         return VStack(spacing: 0) {
             Capsule()
-                .fill(Brand.outline)
+                .fill(Color(white: 0.8))
                 .frame(width: 40, height: 5)
                 .padding(.top, 8)
                 .padding(.bottom, 2)
@@ -624,7 +628,7 @@ struct ContentView: View {
                 if !title.isEmpty {
                     Text(title)
                         .font(.system(size: lerp(20, 26, t), weight: .bold))
-                        .foregroundColor(Brand.ink)
+                        .foregroundColor(.black)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -634,7 +638,7 @@ struct ContentView: View {
                 Button { close() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(Brand.ink)
+                        .foregroundColor(.black)
                         .padding(8)
                 }
             }
@@ -654,7 +658,7 @@ struct ContentView: View {
 
             Text("Покажите QR-код контроллеру")
                 .font(.system(size: lerp(12, 14, t), weight: .regular))
-                .foregroundColor(Brand.muted)
+                .foregroundColor(ticketHint)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .padding(.top, 32)
@@ -663,7 +667,7 @@ struct ContentView: View {
             if !caption.isEmpty {
                 Text(caption.uppercased())
                     .font(.system(size: lerp(16, 22, t), weight: .bold))
-                    .foregroundColor(Brand.ink)
+                    .foregroundColor(.black)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
@@ -674,11 +678,11 @@ struct ContentView: View {
             VStack(spacing: 2) {
                 Text(currentDateString)
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
-                    .foregroundColor(Brand.ink)
+                    .foregroundColor(.black)
 
                 Text("Сумма 80 ₸")
                     .font(.system(size: lerp(12, 14, t), weight: .light))
-                    .foregroundColor(Brand.ink)
+                    .foregroundColor(.black)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
@@ -697,7 +701,7 @@ struct ContentView: View {
                         Text("Квитанция")
                             .font(.caption)
                     }
-                    .foregroundColor(Brand.ink)
+                    .foregroundColor(.black)
                 }
 
                 ShareLink(
@@ -710,7 +714,7 @@ struct ContentView: View {
                         Text("Поделиться")
                             .font(.caption)
                     }
-                    .foregroundColor(Brand.ink)
+                    .foregroundColor(.black)
                 }
             }
             .padding(.bottom, 24)
@@ -826,7 +830,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         if !title.isEmpty {
             Text(title)
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(Brand.ink)
+                .foregroundColor(.black)
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
         }
@@ -834,10 +838,10 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         VStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(Color.white, Brand.success)
+                .foregroundStyle(Color.white, ticketSuccess)
             Text("Успешно")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Brand.ink)
+                .foregroundColor(.black)
         }
         
         Image(uiImage: image)
@@ -848,24 +852,24 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
         
         Text("Покажите QR-код")
             .font(.system(size: 24, weight: .regular))
-            .foregroundColor(Brand.muted)
+            .foregroundColor(ticketHint)
             .multilineTextAlignment(.center)
 
         if !caption.isEmpty {
             Text(caption.uppercased())
                 .font(.system(size: 48, weight: .bold))
-                .foregroundColor(Brand.ink)
+                .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
 
         VStack(spacing: 2) {
             Text(dateString)
                 .font(.system(size: 22, weight: .regular))
-                .foregroundColor(Brand.ink)
+                .foregroundColor(.black)
 
             Text("Сумма 80 ₸")
                 .font(.system(size: 22, weight: .light))
-                .foregroundColor(Brand.ink)
+                .foregroundColor(.black)
                 .multilineTextAlignment(.center)
         }
     }

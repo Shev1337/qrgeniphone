@@ -10,6 +10,5 @@ enum Brand {
     static let paper = Color(hex: "FFF8F7")
     static let outline = Color(hex: "9A737C")
     static let disabled = Color(hex: "DEC7CC")
-    static let success = Color(hex: "28785D")
     static let error = Color(hex: "9A2338")
 }
