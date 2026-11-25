@@ -32,7 +32,7 @@ struct StartScreen: View {
             .padding(.vertical, 18)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { navigationBar }
-        .background(.white.ignoresSafeArea())
+        .background { Color.white.ignoresSafeArea() }
     }
 
     private var brand: some View {
