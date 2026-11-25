@@ -99,6 +99,10 @@ struct ContentView: View {
             && (sourceLink != link || normalizeBusNumber(caption) != nil)
     }
 
+    private var menuAppearance: MenuAppearance {
+        usesClassicAppearance ? .classic : .blue
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
@@ -172,7 +176,7 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.light)
-        .tint(Brand.coral)
+        .tint(usesClassicAppearance ? Brand.coral : menuAppearance.accent)
         .onAppear {
             let app = UIApplication.shared
             if !ScanFlowSheet.usesTestScanner, app.supportsAlternateIcons {
@@ -285,67 +289,78 @@ struct ContentView: View {
     private var form: some View {
         let recent = items.prefix(3)
         return ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Button {
-                    hideKeyboard()
-                    showServices = false
-                } label: {
-                    Label("Главная", systemImage: "chevron.backward")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Brand.burgundy)
-                        .padding(.horizontal, 13)
-                        .frame(minHeight: 44)
-                        .background(.white, in: Capsule())
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("На главный экран")
-                .accessibilityIdentifier("services.back")
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Button {
+                        hideKeyboard()
+                        showServices = false
+                    } label: {
+                        Image(systemName: "chevron.backward")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(menuAppearance.accent)
+                            .frame(width: 44, height: 44)
+                            .background { menuCard(cornerRadius: 13) }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("На главный экран")
+                    .accessibilityIdentifier("services.back")
 
-                Text("QR-генератор")
-                    .font(.system(.largeTitle, design: .serif, weight: .medium))
-                    .foregroundStyle(Brand.ink)
-                    .accessibilityAddTraits(.isHeader)
+                    Text("QR-генератор")
+                        .font(menuAppearance.titleFont)
+                        .foregroundStyle(menuAppearance.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                }
 
                 serviceFields
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(spacing: 0) {
                     Button(action: openHistory) {
-                        HStack {
-                            Label("История чеков", systemImage: "clock")
+                        HStack(spacing: 10) {
+                            Image(systemName: "clock")
+                                .foregroundStyle(menuAppearance.accent)
+                                .accessibilityHidden(true)
+                            Text("История чеков")
                                 .font(.headline)
-                                .foregroundStyle(Brand.ink)
+                                .foregroundStyle(menuAppearance.ink)
                             Spacer(minLength: 10)
                             Image(systemName: "chevron.forward")
                                 .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Brand.burgundy)
+                                .foregroundStyle(menuAppearance.accent)
                                 .accessibilityHidden(true)
                         }
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 48)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 52)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("history.open.services")
 
                     ForEach(recent) { item in
+                        Divider()
+                            .overlay(menuAppearance.separator)
+                            .padding(.horizontal, 14)
+                            .accessibilityHidden(true)
                         row(item)
                     }
                 }
+                .background { menuCard() }
             }
-            .frame(maxWidth: 550, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .frame(maxWidth: 530, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background { Brand.paper.ignoresSafeArea() }
+        .background { menuAppearance.canvas.ignoresSafeArea() }
+        .tint(menuAppearance.accent)
     }
 
     private var serviceFields: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 13) {
             serviceField("Данные QR-кода") {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     TextField("Ссылка или текст", text: Binding(
                         get: { link },
                         set: { value in
@@ -356,41 +371,43 @@ struct ContentView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
-                    .foregroundStyle(Brand.ink)
+                    .foregroundStyle(menuAppearance.ink)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .frame(minHeight: 48)
-                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.vertical, 8)
+                    .layoutPriority(1)
+                    .accessibilityIdentifier(usesClassicAppearance ? "services.payload.classic" : "services.payload.blue")
 
                     Button(action: beginScan) {
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(Brand.burgundy)
-                            .frame(width: 48, height: 48)
-                            .background(Brand.blush, in: RoundedRectangle(cornerRadius: 12))
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(menuAppearance.accent)
+                            .frame(width: 44, height: 44)
+                            .background(menuAppearance.softAccent, in: RoundedRectangle(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Сканировать QR-код")
                     .accessibilityIdentifier("scan.open")
                 }
+                .padding(3)
+                .background(menuAppearance.input, in: RoundedRectangle(cornerRadius: 13))
             }
 
             serviceField("Номер автобуса") {
                 BusNumberField(text: $caption)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.vertical, 8)
                     .frame(minHeight: 48)
-                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
+                    .background(menuAppearance.input, in: RoundedRectangle(cornerRadius: 13))
             }
 
             serviceField("Текст на чеке") {
                 TextField("Необязательно", text: $title)
                     .accessibilityLabel("Текст на чеке")
-                    .foregroundStyle(Brand.ink)
+                    .foregroundStyle(menuAppearance.ink)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.vertical, 8)
                     .frame(minHeight: 48)
-                    .background(Brand.paper, in: RoundedRectangle(cornerRadius: 12))
+                    .background(menuAppearance.input, in: RoundedRectangle(cornerRadius: 13))
             }
 
             serviceField("Плотность QR-кода") {
@@ -404,7 +421,7 @@ struct ContentView: View {
                 if density > 0 && !link.isEmpty {
                     Text("В коде: \(sourceLink == link ? link : densePayload(link, level: density))")
                         .font(.caption2)
-                        .foregroundStyle(Brand.muted)
+                        .foregroundStyle(menuAppearance.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -417,11 +434,11 @@ struct ContentView: View {
                     Text("Создать QR-код")
                         .font(.headline.weight(.semibold))
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(canGenerate ? .white : Brand.muted)
+                        .foregroundStyle(canGenerate ? .white : menuAppearance.muted)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(canGenerate ? Brand.burgundy : Brand.blush, in: RoundedRectangle(cornerRadius: 13))
+                        .background(canGenerate ? menuAppearance.accent : menuAppearance.softAccent, in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
                 .disabled(!canGenerate)
@@ -431,31 +448,36 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "bookmark")
                         .font(.title3.weight(.medium))
-                        .foregroundStyle(canGenerate ? Brand.burgundy : Brand.outline)
+                        .foregroundStyle(canGenerate ? menuAppearance.accent : menuAppearance.muted)
                         .frame(width: 50, height: 50)
-                        .background(Brand.blush, in: RoundedRectangle(cornerRadius: 13))
+                        .background(menuAppearance.softAccent, in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Сохранить чек")
                 .disabled(!canGenerate)
             }
         }
-        .padding(16)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Brand.line)
-                .allowsHitTesting(false)
-        }
+        .padding(14)
+        .background { menuCard() }
+    }
+
+    private func menuCard(cornerRadius: CGFloat = 20) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.white)
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(menuAppearance.separator)
+            }
+            .allowsHitTesting(false)
     }
 
     private func serviceField<Content: View>(
         _ label: String, @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(Brand.muted)
+                .foregroundStyle(menuAppearance.muted)
             content()
         }
     }
@@ -471,23 +493,23 @@ struct ContentView: View {
                 HStack(spacing: 12) {
                     Image(systemName: item.pinnedAt == nil ? "doc.text" : "pin.fill")
                         .font(.body.weight(.medium))
-                        .foregroundStyle(Brand.burgundy)
+                        .foregroundStyle(menuAppearance.accent)
                         .frame(width: 40, height: 40)
-                        .background(Brand.blush, in: RoundedRectangle(cornerRadius: 11))
+                        .background(menuAppearance.softAccent, in: RoundedRectangle(cornerRadius: 11))
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(primary)
                             .font(.headline)
-                            .foregroundStyle(Brand.ink)
+                            .foregroundStyle(menuAppearance.ink)
                             .lineLimit(1)
                         Text(formattedDate(item.date))
                             .font(.footnote.monospacedDigit())
-                            .foregroundStyle(Brand.muted)
+                            .foregroundStyle(menuAppearance.muted)
                         if primary != item.link {
                             Text(item.link)
                                 .font(.caption)
-                                .foregroundStyle(Brand.muted)
+                                .foregroundStyle(menuAppearance.muted)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
@@ -528,21 +550,15 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Brand.burgundy)
+                    .foregroundStyle(menuAppearance.accent)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Действия с чеком")
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 5)
-        .padding(.vertical, 11)
-        .background(.white, in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Brand.line)
-                .allowsHitTesting(false)
-        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .padding(.vertical, 9)
     }
 
     private func reviewCurrent(open: Bool) {
@@ -574,16 +590,16 @@ struct ContentView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "clock")
                             .font(.title2.weight(.medium))
-                            .foregroundStyle(Brand.burgundy)
+                            .foregroundStyle(menuAppearance.accent)
                             .frame(width: 54, height: 54)
-                            .background(Brand.blush, in: RoundedRectangle(cornerRadius: 16))
+                            .background(menuAppearance.softAccent, in: RoundedRectangle(cornerRadius: 16))
                             .accessibilityHidden(true)
                         Text("История пока пуста")
                             .font(.headline)
-                            .foregroundStyle(Brand.ink)
+                            .foregroundStyle(menuAppearance.ink)
                         Text("Здесь появятся созданные чеки")
                             .font(.subheadline)
-                            .foregroundStyle(Brand.muted)
+                            .foregroundStyle(menuAppearance.muted)
                     }
                     .multilineTextAlignment(.center)
                     .padding(24)
@@ -603,10 +619,10 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .background { Brand.paper.ignoresSafeArea() }
+            .background { menuAppearance.canvas.ignoresSafeArea() }
             .navigationTitle("История чеков")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Brand.paper, for: .navigationBar)
+            .toolbarBackground(menuAppearance.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -632,13 +648,14 @@ struct ContentView: View {
                 Button("Отмена", role: .cancel) {}
             }
         }
-        .tint(Brand.burgundy)
+        .tint(menuAppearance.accent)
     }
 
     private func historySection(_ title: String, receipts: [SavedItem]) -> some View {
         Section {
             ForEach(receipts) { item in
                 row(item)
+                    .background { menuCard(cornerRadius: 14) }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     .listRowSeparator(.hidden)
@@ -653,7 +670,7 @@ struct ContentView: View {
         } header: {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Brand.muted)
+                .foregroundStyle(menuAppearance.muted)
                 .textCase(nil)
         }
     }

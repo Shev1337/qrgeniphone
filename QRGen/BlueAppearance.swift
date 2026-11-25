@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum BlueAppearance {
+enum BlueAppearance {
     static let accent = Color(hex: "1643BA")
     static let navy = Color(hex: "122863")
     static let canvas = Color(hex: "EEF3FC")
@@ -196,27 +196,40 @@ struct BlueReceiptView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let qrWidth = max(0, min(proxy.size.width - 68, 380))
+            let paperWidth = max(0, min(proxy.size.width - 36, 450))
+            let qrWidth = max(0, min(paperWidth - 32, 380))
             ScrollView {
-                VStack(spacing: 16) {
-                    header
-                    qrPanel(side: qrExpanded ? qrWidth : min(qrWidth * 0.9, 292))
-                    routeLabel
-                    perforation
-                    details
-                    actions
+                VStack(spacing: 0) {
+                    VStack(spacing: 14) {
+                        header
+                        qrPanel(side: qrExpanded ? qrWidth : min(qrWidth * 0.92, 300))
+                        routeLabel
+                    }
+                    .padding(16)
+                    .padding(.bottom, 6)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [BlueAppearance.accent, BlueAppearance.navy],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: TicketPaper(notchAtTop: false)
+                    )
+
+                    VStack(spacing: 14) {
+                        details
+                        actions
+                    }
+                    .padding(16)
+                    .padding(.top, 6)
+                    .frame(maxWidth: .infinity)
+                    .background(BlueAppearance.navy, in: TicketPaper(notchAtTop: true))
+                    .overlay(alignment: .top) { perforation }
                 }
-                .padding(16)
-                .frame(maxWidth: 450)
                 .foregroundStyle(.white)
-                .background(
-                    LinearGradient(
-                        colors: [BlueAppearance.accent, BlueAppearance.navy],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 26)
-                )
+                .frame(width: paperWidth)
+                .compositingGroup()
                 .shadow(color: .black.opacity(0.24), radius: 14, y: 6)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 16)
@@ -272,15 +285,16 @@ struct BlueReceiptView: View {
     }
 
     private var routeLabel: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(spacing: 3) {
             Text("Маршрут")
                 .font(.subheadline)
                 .foregroundStyle(accentText)
             Text(route)
                 .font(.largeTitle.bold())
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
 
@@ -290,10 +304,13 @@ struct BlueReceiptView: View {
                 path.move(to: CGPoint(x: 0, y: 0.5))
                 path.addLine(to: CGPoint(x: proxy.size.width, y: 0.5))
             }
-            .stroke(.white.opacity(0.38), style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
+            .stroke(.white.opacity(0.42), style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [4, 6]))
         }
         .frame(height: 1)
+        .padding(.horizontal, TicketPaper.notchDepth + 6)
+        .offset(y: -0.5)
         .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     private var detailLayout: AnyLayout {
@@ -356,5 +373,48 @@ struct BlueReceiptView: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, 8)
             .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct TicketPaper: Shape {
+    static let notchDepth: CGFloat = 13
+    let notchAtTop: Bool
+
+    func path(in rect: CGRect) -> Path {
+        guard !rect.isEmpty else { return Path() }
+        let corner = min(26, rect.width / 2, rect.height / 2)
+        let notch = min(Self.notchDepth, rect.width / 2, rect.height / 2)
+        let left = rect.minX
+        let right = rect.maxX
+        let top = rect.minY
+        let bottom = rect.maxY
+
+        var path = Path()
+        path.move(to: CGPoint(x: left + corner, y: top))
+        path.addLine(to: CGPoint(x: right - corner, y: top))
+        path.addQuadCurve(to: CGPoint(x: right, y: top + corner), control: CGPoint(x: right, y: top))
+        path.addLine(to: CGPoint(x: right, y: bottom - notch))
+        path.addRelativeArc(
+            center: CGPoint(x: right, y: bottom),
+            radius: notch,
+            startAngle: .degrees(-90),
+            delta: .degrees(-90)
+        )
+        path.addLine(to: CGPoint(x: left + notch, y: bottom))
+        path.addRelativeArc(
+            center: CGPoint(x: left, y: bottom),
+            radius: notch,
+            startAngle: .degrees(0),
+            delta: .degrees(-90)
+        )
+        path.addLine(to: CGPoint(x: left, y: top + corner))
+        path.addQuadCurve(to: CGPoint(x: left + corner, y: top), control: CGPoint(x: left, y: top))
+        path.closeSubpath()
+
+        if notchAtTop {
+            let flip = CGAffineTransform(translationX: 0, y: top + bottom).scaledBy(x: 1, y: -1)
+            return path.applying(flip)
+        }
+        return path
     }
 }
