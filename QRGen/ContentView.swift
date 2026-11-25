@@ -45,6 +45,7 @@ struct ContentView: View {
     @State private var showServices = false
     @State private var showCard = false
     @State private var showScanner = false
+    @State private var manualConfirmation: ReceiptDraft?
     @State private var expanded = false
     @State private var drag: CGFloat = 0
     @State private var originalBrightness: CGFloat = 1.0
@@ -150,6 +151,19 @@ struct ContentView: View {
             ScanFlowSheet(initialTitle: title) { ticket, image in
                 openCard(ticket, image: image, recordCreation: true)
             }
+        }
+        .sheet(item: $manualConfirmation) { draft in
+            ReceiptConfirmationView(draft: draft, onCancel: { manualConfirmation = nil }) { ticket, image in
+                manualConfirmation = nil
+                if draft.opensReceipt {
+                    openCard(ticket, image: image, recordCreation: true)
+                } else {
+                    fillForm(from: ticket)
+                    setItems(ticket.addedToHistory(items))
+                }
+            }
+            .presentationDetents([ReceiptConfirmationView.compactDetent, .large])
+            .presentationDragIndicator(.visible)
         }
         .alert("QRArest", isPresented: $showError) {
             Button("ОК", role: .cancel) {}
@@ -338,7 +352,7 @@ struct ContentView: View {
 
             HStack(spacing: 8) {
                 Button {
-                    saveCurrent(open: true)
+                    reviewCurrent(open: true)
                 } label: {
                     Text("Создать QR-код")
                         .font(.headline.weight(.semibold))
@@ -353,8 +367,7 @@ struct ContentView: View {
                 .disabled(!canGenerate)
 
                 Button {
-                    hideKeyboard()
-                    saveCurrent()
+                    reviewCurrent(open: false)
                 } label: {
                     Image(systemName: "bookmark")
                         .font(.title3.weight(.medium))
@@ -472,22 +485,15 @@ struct ContentView: View {
         }
     }
 
-    private func saveCurrent(open: Bool = false) {
+    private func reviewCurrent(open: Bool) {
         guard canGenerate else { return }
+        hideKeyboard()
         let fromScan = sourceLink == link
         let input = fromScan ? link : link.trimmingCharacters(in: .whitespacesAndNewlines)
         let number = normalizeBusNumber(caption) ?? caption.uppercased()
         let ticket = SavedItem(link: input, caption: number, title: title, fromScan: fromScan)
             .repeated { densePayload($0, level: density) }
-        if open {
-            openCard(ticket, recordCreation: true)
-        } else {
-            guard makeQR(from: ticket.payload).cgImage != nil else {
-                presentError("Эти данные не помещаются в QR-код чека.")
-                return
-            }
-            setItems(ticket.addedToHistory(items))
-        }
+        manualConfirmation = ReceiptDraft(ticket: ticket, opensReceipt: open)
     }
 
     // MARK: - История
@@ -680,7 +686,7 @@ struct ContentView: View {
                     .font(.system(size: lerp(12, 14, t), weight: .regular))
                     .foregroundColor(.black)
 
-                Text("Сумма 80 ₸")
+                Text("Сумма \(receiptAmountTenge) ₸")
                     .font(.system(size: lerp(12, 14, t), weight: .light))
                     .foregroundColor(.black)
                     .multilineTextAlignment(.center)
@@ -867,7 +873,7 @@ func printQR(image: UIImage, title: String, caption: String, dateString: String)
                 .font(.system(size: 22, weight: .regular))
                 .foregroundColor(.black)
 
-            Text("Сумма 80 ₸")
+            Text("Сумма \(receiptAmountTenge) ₸")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.black)
                 .multilineTextAlignment(.center)

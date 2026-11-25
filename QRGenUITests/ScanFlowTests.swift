@@ -7,7 +7,7 @@ final class ScanFlowTests: XCTestCase {
         readQRCode(in: app)
         verifyReview(in: app, scan: 1, number: "721BG04")
 
-        app.buttons["scan.review.confirm"].tap()
+        app.buttons["receipt.review.confirm"].tap()
         XCTAssertTrue(app.images["ticket.qr"].waitForExistence(timeout: 5))
     }
 
@@ -17,11 +17,37 @@ final class ScanFlowTests: XCTestCase {
         readQRCode(in: app)
         verifyReview(in: app, scan: 1, number: "721BG04")
 
-        let rescan = app.buttons["scan.review.rescan"]
-        if !rescan.isHittable { app.scrollViews.firstMatch.swipeUp() }
-        rescan.tap()
+        app.buttons["receipt.review.rescan"].tap()
         readQRCode(in: app)
         verifyReview(in: app, scan: 2, number: "837AY04")
+    }
+
+    @MainActor
+    func testManualReceiptRequiresConfirmation() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let services = app.buttons["services.open"]
+        XCTAssertTrue(services.waitForExistence(timeout: 10))
+        services.tap()
+
+        let create = app.buttons["Создать QR-код"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        if !create.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        create.tap()
+
+        let confirm = app.buttons["receipt.review.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.images["ticket.qr"].exists)
+        app.buttons["receipt.review.cancel"].tap()
+        let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+        XCTAssertFalse(app.images["ticket.qr"].exists)
+
+        create.tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(app.images["ticket.qr"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -59,11 +85,11 @@ final class ScanFlowTests: XCTestCase {
     @MainActor
     private func verifyReview(in app: XCUIApplication, scan: Int, number: String) {
         let expected = "https://example.com/scan/\(scan)?ticket=123"
-        let payload = app.staticTexts["scan.review.payload"]
+        let payload = app.staticTexts["receipt.review.payload"]
         XCTAssertTrue(payload.waitForExistence(timeout: 5))
         XCTAssertEqual(payload.label, expected)
-        XCTAssertTrue(app.images["scan.review.preview"].exists)
-        XCTAssertEqual(app.textFields["scan.review.number"].value as? String, number)
-        XCTAssertTrue(app.buttons["scan.review.confirm"].isEnabled)
+        XCTAssertTrue(app.images["receipt.review.preview"].exists)
+        XCTAssertEqual(app.textFields["receipt.review.number"].value as? String, number)
+        XCTAssertTrue(app.buttons["receipt.review.confirm"].isEnabled)
     }
 }

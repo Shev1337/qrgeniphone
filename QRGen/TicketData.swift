@@ -1,5 +1,7 @@
 import Foundation
 
+let receiptAmountTenge = 80
+
 struct SavedItem: Codable, Identifiable, Equatable {
     var id: UUID
     var link: String
